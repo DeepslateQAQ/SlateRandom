@@ -1,0 +1,1 @@
+<template><div id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div><div id="toast" class="toast" data-toast-host role="status" aria-live="polite" aria-atomic="true" hidden></div></template>

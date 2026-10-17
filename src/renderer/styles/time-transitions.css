@@ -1,0 +1,12 @@
+/* FLIP owns the brief layout change; native flex/font transitions would expose
+   a reordered intermediate row before the selected digits start moving. */
+.time-visual[data-layout-flip] .time-reveal-row,
+.time-visual[data-layout-flip] .time-digits,
+.time-visual[data-layout-flip] .time-digit,
+.time-visual[data-layout-flip] .time-digits i,
+.time-visual[data-layout-flip] .time-match-name{transition:none!important}
+.time-visual[data-layout-flip] .time-digit.chosen,
+.time-visual[data-layout-flip] .time-match-name{will-change:transform,opacity}
+.time-digits-ghost-layer{position:fixed;inset:0;z-index:24;overflow:hidden;pointer-events:none;contain:strict}
+.time-digit-ghost{position:absolute;display:block;overflow:visible;margin:0;border:0;white-space:pre;pointer-events:none}
+@media(prefers-reduced-motion:reduce){.time-digits-ghost-layer{display:none}}

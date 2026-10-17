@@ -1,0 +1,10 @@
+import {spawn} from 'node:child_process';
+import {mkdtemp,mkdir,readFile,writeFile,rm,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';import path from 'node:path';import {fileURLToPath} from 'node:url';import {createRequire} from 'node:module';import {createHash} from 'node:crypto';
+const root=fileURLToPath(new URL('../../',import.meta.url)),require=createRequire(import.meta.url),out=path.join(root,'qa-output');
+const parent=await realpath(tmpdir()),profile=await mkdtemp(path.join(parent,'SlateRandom-electron-'));
+await mkdir(out,{recursive:true});const html=await readFile(path.join(root,'dist/index.html'));
+const performance=process.argv.includes('--performance');
+const env={...process.env,SLATE_QA_OUTPUT:out};delete env.ELECTRON_RUN_AS_NODE;
+try{await new Promise((resolve,reject)=>{const child=spawn(require('electron'),[path.join(root,'tests/integration/qa-electron-driver.cjs'),'--slate-qa','--slate-hidden','--slate-user-data='+profile,...(performance?['--slate-performance']:[])],{cwd:root,windowsHide:true,env,stdio:'inherit'});const timeout=setTimeout(()=>{child.kill();reject(Error('Desktop QA timed out'));},performance?600000:120000);child.once('error',e=>{clearTimeout(timeout);reject(e)});child.once('exit',code=>{clearTimeout(timeout);code===0?resolve():reject(Error('Desktop QA exited '+code))});});const p=path.join(out,performance?'scene-performance-report.json':'desktop-report.json'),r=JSON.parse(await readFile(p,'utf8'));const sha256=createHash('sha256').update(html).digest('hex');if(performance&&r.artifactSha256!==sha256)throw Error('Performance report HTML does not match the wrapper artifact.');r.artifactBytes=html.length;r.artifactSha256=sha256;r.portableDataRoot=profile;r.browserProfileLayout='data/browser';await writeFile(p,JSON.stringify(r,null,2));}
+finally{const verified=await realpath(profile).catch(()=>null);if(verified&&path.dirname(verified)===parent&&path.basename(verified).startsWith('SlateRandom-electron-'))await rm(verified,{recursive:true,force:true,maxRetries:10,retryDelay:250}).catch(()=>{});}

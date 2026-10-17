@@ -1,0 +1,40 @@
+/* A native, touch-sized overview toggle. */
+.render-style-picker{--render-picker-bottom:16px;--button-glow:var(--stage-text);position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(var(--render-picker-bottom),env(safe-area-inset-bottom));z-index:14;display:inline-flex;align-items:center;justify-content:center;gap:8px;width:96px;min-width:46px;max-width:calc(100% - 32px);height:46px;min-height:46px;margin:0;padding:0 12px;border:1px solid var(--stage-overlay-border);border-radius:var(--radius-control);background:transparent;color:var(--stage-overlay-text);font-size:12px;line-height:1;white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-tap-highlight-color:transparent;transition:bottom 360ms var(--ease-move),transform 200ms var(--ease-move),background-color 220ms var(--ease-move),color 220ms var(--ease-move),border-color 220ms var(--ease-move),opacity 220ms var(--ease-move)}
+[data-render-style="overview"] .render-style-picker:not(:disabled):hover,[data-render-style="overview"] .render-style-picker:focus-visible{z-index:14}
+.draw-screen .render-style-picker:is(:hover,:focus-visible,:active){z-index:15}
+.render-style-picker>.icon{font-size:21px;line-height:1}
+.render-style-picker[aria-pressed="true"]{--button-glow:var(--color-accent);background:var(--color-accent);border-color:var(--color-accent);color:var(--accent-contrast)}
+.render-style-picker:disabled{opacity:.48;cursor:default}
+.render-style-picker:focus-visible{outline:2px solid var(--color-accent);outline-offset:4px}
+
+/* Overview keeps identical square controls in the lower left. Only the active
+   control opens horizontally; its full visual width remains the hit target. */
+.draw-screen[data-render-style="overview"] .home-actions{--home-action-height:48px;position:absolute;left:max(16px,env(safe-area-inset-left));right:auto;bottom:max(16px,env(safe-area-inset-bottom));width:max-content;max-width:calc(100% - 32px);gap:8px;justify-content:flex-start;flex-wrap:nowrap;transform:none}
+.draw-screen[data-render-style="overview"].is-animating .home-actions,.draw-screen[data-render-style="overview"].is-lifecycle .home-actions{opacity:1;pointer-events:auto}
+.draw-screen[data-render-style="overview"] .draw-stage{opacity:0!important;visibility:hidden;pointer-events:none}
+.draw-screen[data-render-style="overview"] .home-actions>button{display:flex;align-items:center;justify-content:flex-start;gap:0;flex:0 1 auto;width:48px;min-width:48px;max-width:136px;height:48px;min-height:48px;padding:0;border-radius:var(--radius-control);font-size:13px;line-height:1;letter-spacing:0;text-indent:0;overflow:hidden;white-space:nowrap;transition:width 360ms cubic-bezier(.2,.8,.2,1),transform 180ms cubic-bezier(.2,.7,.3,1),box-shadow 220ms cubic-bezier(.22,.7,.25,1),background-color 180ms cubic-bezier(.22,.7,.25,1),color 180ms cubic-bezier(.22,.7,.25,1)}
+.draw-screen[data-render-style="overview"] .home-actions>button>.icon{display:flex;align-items:center;justify-content:center;flex:0 0 46px;width:46px;height:46px;margin:0;font-size:24px;line-height:1;letter-spacing:0;text-indent:0}
+.draw-screen[data-render-style="overview"] .home-actions #drawButtonText,.draw-screen[data-render-style="overview"] .home-actions .action-label{display:block;flex:0 0 auto;max-width:0;margin:0;padding:0;overflow:hidden;opacity:0;transform:translateX(-6px);transition:max-width 360ms cubic-bezier(.2,.8,.2,1),padding-right 360ms cubic-bezier(.2,.8,.2,1),opacity 200ms cubic-bezier(.22,.7,.25,1),transform 360ms cubic-bezier(.2,.8,.2,1)}
+.draw-screen[data-render-style="overview"] .home-actions>button:is(:focus-visible,[data-holding],[data-reset-holding],[data-hold-releasing],.is-shortcut-pressed){width:128px}
+.draw-screen[data-render-style="overview"] .home-actions>.reset-draw-btn:is(:focus-visible,[data-reset-holding],[data-hold-releasing],.is-shortcut-pressed){width:104px}
+.draw-screen[data-render-style="overview"] .home-actions>.exit-chain:is(:focus-visible,.is-shortcut-pressed){width:136px}
+.draw-screen[data-render-style="overview"] .home-actions>button:is(:focus-visible,[data-holding],[data-reset-holding],[data-hold-releasing],.is-shortcut-pressed)>:is(#drawButtonText,.action-label){max-width:80px;padding-right:14px;opacity:1;transform:translateX(0)}
+@media(hover:hover){
+  .draw-screen[data-render-style="overview"] .home-actions>button:hover{width:128px}
+  .draw-screen[data-render-style="overview"] .home-actions>.reset-draw-btn:hover{width:104px}
+  .draw-screen[data-render-style="overview"] .home-actions>.exit-chain:hover{width:136px}
+  .draw-screen[data-render-style="overview"] .home-actions>button:hover>:is(#drawButtonText,.action-label){max-width:80px;padding-right:14px;opacity:1;transform:translateX(0)}
+}
+@media(max-width:600px){
+  .draw-screen[data-render-style="overview"] .render-style-picker{--render-picker-bottom:76px}
+}
+@media(prefers-reduced-motion:reduce){
+  .render-style-picker,.draw-screen[data-render-style="overview"] .home-actions>button,.draw-screen[data-render-style="overview"] .home-actions #drawButtonText,.draw-screen[data-render-style="overview"] .home-actions .action-label{transition:none}
+}
+
+/* Overview keeps peripheral classmates visible during the directional spin. */
+.draw-screen[data-render-style="overview"]{--bottom-shade-height:80px}
+@media(max-width:600px){.draw-screen[data-render-style="overview"]{--bottom-shade-height:132px}}
+.draw-screen[data-render-style="overview"].is-animating[data-animation="direction"] .live-seat:not(.in-neighborhood):not(.candidate){opacity:1}
+.draw-screen[data-render-style="overview"].is-animating[data-animation="direction"] .live-seat.seen:not(.candidate){opacity:.3}
+.draw-screen[data-render-style="overview"].is-animating[data-animation="direction"] .live-seat.paused:not(.candidate){opacity:.15}

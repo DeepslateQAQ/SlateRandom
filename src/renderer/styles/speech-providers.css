@@ -1,0 +1,12 @@
+.speech-provider-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;margin:0 0 18px;padding:0 0 16px;border-bottom:1px solid var(--tone-ddd)}
+.speech-provider-toolbar .field-hint{margin:0;flex:1;min-width:160px;overflow-wrap:anywhere}
+.speech-provider-dialog{width:min(600px,calc(100vw - 24px));color:var(--color-settings-text);background:var(--color-paper);border-radius:var(--radius-dialog)}
+.speech-provider-dialog .dialog-heading{padding:22px 24px}.speech-provider-dialog .dialog-body{padding:20px 24px}
+.speech-provider-dialog .dialog-footer{padding:18px 24px}.speech-provider-dialog .field-hint{line-height:1.75;overflow-wrap:anywhere}
+.speech-provider-dialog label:not(.checkbox-label){display:flex;flex-direction:column;gap:5px}
+.speech-provider-dialog .form-grid{gap:16px}.speech-provider-dialog input,.speech-provider-dialog select{min-width:0;width:100%}
+.speech-provider-dialog .checkbox-label{display:flex;align-items:center;gap:10px;margin-top:16px;min-height:44px}
+.speech-provider-dialog .checkbox-label input[type="checkbox"]{width:48px;flex:0 0 48px}
+.speech-provider-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin-top:12px}
+.speech-provider-dialog .danger-text{color:var(--settings-danger)}.speech-provider-dialog .error-message:empty{display:none}
+@media(max-width:440px){.speech-provider-dialog .dialog-heading{padding:16px 18px}.speech-provider-dialog .dialog-body{padding:18px}.speech-provider-dialog .dialog-footer{padding:15px 18px}.speech-provider-dialog .form-grid{grid-template-columns:1fr;gap:0}}

@@ -1,0 +1,45 @@
+/* White settings panels use flat rows, with every probability beside its mode. */
+.mode-settings{display:block;width:100%;min-width:0;border-top:1px solid var(--tone-ddd)}
+.mode-setting-row{display:grid;grid-template-columns:minmax(84px,1fr) 62px 52px 44px;gap:10px;align-items:center;min-height:68px;padding:8px 0;border-bottom:1px solid var(--tone-ddd);color:var(--color-settings-text);background:var(--color-paper);cursor:pointer;touch-action:manipulation;transition:background-color 180ms cubic-bezier(.22,.7,.25,1),box-shadow 180ms cubic-bezier(.22,.7,.25,1)}
+.mode-setting-heading{display:flex;align-items:center;gap:10px;min-width:0;pointer-events:none}
+.mode-setting-heading>.icon{flex:0 0 24px;width:24px;height:24px;font-size:24px;line-height:1}
+.mode-setting-name{display:block;min-width:0;white-space:nowrap;font-size:14px;line-height:1.4;font-weight:500}
+.mode-setting-row.is-manual-selected .mode-setting-name{font-weight:700;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px}
+.mode-setting-probability,.mode-setting-switch{display:flex;align-items:center;justify-content:center;min-width:0;min-height:44px;margin:0!important;padding:0;color:var(--color-settings-text);cursor:default}
+.mode-setting-probability{gap:1px}
+.dialog .mode-setting-probability>input:not([type="checkbox"]):not([type="range"]){display:inline-block;box-sizing:border-box;width:46px;min-width:0;min-height:44px;margin:0;padding:8px 2px;border:0;border-bottom:1px solid var(--tone-ccc);background:transparent;color:var(--color-settings-text);line-height:1;font-size:14px;text-align:right;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield;border-radius:var(--radius-control);transition:border-color 180ms cubic-bezier(.22,.7,.25,1),opacity 180ms cubic-bezier(.22,.7,.25,1)}
+.mode-setting-probability>input::-webkit-inner-spin-button,.mode-setting-probability>input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.mode-setting-probability>input:read-only{border-bottom-color:transparent!important;cursor:default}
+.mode-setting-probability>input:disabled{opacity:.42}
+.mode-setting-percent{font-size:12px;line-height:1;color:var(--tone-666)}
+.mode-setting-switch{cursor:pointer;touch-action:manipulation}
+.dialog .mode-setting-switch>input[type="checkbox"]{--switch-travel:20px;width:48px;min-width:48px;min-height:28px;height:28px;flex:0 0 48px;margin:0!important;border-radius:var(--radius-control)}
+.mode-setting-details{display:flex;align-items:center;justify-content:center;width:44px;min-width:44px;height:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:var(--radius-control);background:transparent;color:var(--color-settings-text);cursor:pointer;touch-action:manipulation;transition:background-color 180ms cubic-bezier(.22,.7,.25,1),transform 180ms cubic-bezier(.22,.7,.25,1)}
+.mode-setting-details>.icon{display:block;width:20px;height:20px;font-size:20px;line-height:1}
+.mode-setting-row:focus-visible{outline:2px solid var(--color-settings-text);outline-offset:-2px}
+.mode-setting-row[aria-disabled="true"]{cursor:default}
+.mode-setting-row.has-no-details{cursor:default}
+.mode-setting-row[aria-disabled="true"] .mode-setting-heading{opacity:.48}
+.mode-setting-details:disabled{cursor:default;opacity:.4}
+@media(hover:hover){
+  .mode-setting-row:not([aria-disabled="true"]):hover{background:var(--tone-f8f8f8)}
+  .mode-setting-details:not(:disabled):hover{background:var(--settings-hover);transform:perspective(600px) translateZ(8px)}
+  .mode-setting-switch:hover>input:not(:disabled){border-color:var(--color-settings-text);box-shadow:0 0 12px color-mix(in srgb,var(--settings-text) 8%,transparent)}
+}
+@media(max-width:420px){
+  .mode-setting-row{grid-template-columns:minmax(72px,1fr) 54px 44px 44px;gap:6px;min-height:64px}
+  .mode-setting-heading{gap:6px}
+  .mode-setting-heading>.icon{flex-basis:20px;width:20px;height:20px;font-size:20px}
+  .mode-setting-name{font-size:12px}
+  .dialog .mode-setting-probability>input:not([type="checkbox"]):not([type="range"]){width:40px;font-size:13px}
+  .dialog .mode-setting-switch>input[type="checkbox"]{--switch-travel:16px;width:44px;min-width:44px;flex-basis:44px}
+}
+@media(prefers-reduced-motion:reduce){
+  .mode-setting-row,.mode-setting-probability>input,.mode-setting-details{transition:none}
+  .mode-setting-details:not(:disabled):hover{transform:none}
+}
+@media(forced-colors:active){
+  .mode-setting-row{color:CanvasText;background:Canvas;border-color:CanvasText}
+  .mode-setting-percent,.mode-setting-details{color:CanvasText}
+  .mode-setting-row.is-manual-selected{outline:1px solid Highlight;outline-offset:-1px}
+}

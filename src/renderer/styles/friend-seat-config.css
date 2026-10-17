@@ -1,0 +1,31 @@
+#friendSeatToolbar {
+  position:absolute;z-index:40;display:flex;align-items:center;gap:5px;
+  max-width:calc(100% - 16px);padding:6px;border:1px solid var(--tone-222);border-radius:var(--radius-control);background:var(--color-paper);color:var(--color-settings-text);
+  box-shadow:0 7px 22px var(--tone-0002),0 2px 5px var(--tone-0001);isolation:isolate;
+}
+#friendSeatToolbar[hidden] { display:none }
+#friendSeatToolbar button {
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-width:44px;min-height:44px;padding:8px 13px;border:1px solid transparent;border-radius:var(--radius-inset-7);
+  background:var(--color-paper);color:var(--color-settings-text);white-space:nowrap;font-size:13px;line-height:1.3;
+}
+#friendSeatToolbar button:hover { background:var(--tone-f0f0f0);border-color:var(--tone-dedede) }
+#friendSeatToolbar .friend-target-save { background:var(--tone-bd2525);color:#fff;border-color:var(--tone-bd2525);--button-glow:var(--tone-bd2525) }
+#friendSeatToolbar .friend-target-save:hover { background:var(--tone-a21e1e);border-color:var(--tone-a21e1e) }
+#friendSeatToolbar .friend-target-cancel { border-color:var(--tone-ccc) }
+#rosterSeats .seat.friend-config-source { outline:2px solid var(--color-settings-text);outline-offset:2px }
+#rosterSeats .seat.friend-config-source-editing {
+  opacity:1;background:var(--tone-dedede);border-color:var(--tone-8b8b8b);color:var(--tone-555);
+  outline-color:var(--tone-8b8b8b);box-shadow:none;--button-glow:var(--tone-999);
+}
+#rosterSeats .seat.friend-config-source-editing .seat-id { color:var(--tone-666) }
+#rosterSeats .seat.friend-config-target {
+  opacity:1;background:var(--tone-d83232);border-color:var(--tone-d83232);color:#fff;
+  box-shadow:0 0 16px var(--tone-d8323245),inset 0 0 0 1px var(--tone-ffadad45);--button-glow:var(--tone-d83232);
+}
+#rosterSeats .seat.friend-config-target .seat-id { color:var(--tone-ffe2e2) }
+#rosterSeats .seat.friend-config-target:hover { background:var(--tone-e13c3c);border-color:var(--tone-e13c3c) }
+@media(max-width:359px) {
+  #friendSeatToolbar { gap:3px;padding:5px }
+  #friendSeatToolbar button { gap:5px;padding:8px 10px;font-size:12px }
+}

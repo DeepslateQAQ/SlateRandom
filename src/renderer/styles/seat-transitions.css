@@ -1,0 +1,9 @@
+/* Seat lifecycle effects stay inside the existing camera world and beneath UI. */
+.live-seat.seat-transition-running{transition:none!important;will-change:transform,opacity;pointer-events:none}
+.live-seat.seat-transition-entering{opacity:0;visibility:hidden}
+.live-seat.seat-transition-running::after{display:none!important}
+.live-seat-scroll[data-transition]{pointer-events:none;overflow:hidden}
+.live-seat-scroll[data-transition] .seat-arrow{visibility:hidden}
+@media(prefers-reduced-motion:reduce){
+  .live-seat.seat-transition-running{will-change:auto}
+}

@@ -1,0 +1,4 @@
+.dialog{transform-origin:center center}
+.dialog[data-motion]{will-change:transform,opacity;backface-visibility:hidden}
+.dialog[data-motion="exit"]{pointer-events:none}
+@media(prefers-reduced-motion:reduce){.dialog[data-motion]{will-change:auto}}

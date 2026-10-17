@@ -1,0 +1,18 @@
+nodeLinker: hoisted
+
+allowBuilds:
+  esbuild@0.28.2: true
+  electron@44.7.2: true
+
+minimumReleaseAgeExclude:
+  - '@vue/compiler-core@3.5.44'
+  - '@vue/compiler-dom@3.5.44'
+  - '@vue/compiler-sfc@3.5.44'
+  - '@vue/compiler-ssr@3.5.44'
+  - '@vue/reactivity@3.5.44'
+  - '@vue/runtime-core@3.5.44'
+  - '@vue/runtime-dom@3.5.44'
+  - '@vue/server-renderer@3.5.44'
+  - '@vue/shared@3.5.44'
+  - vue@3.5.44
+  - electron@44.7.2

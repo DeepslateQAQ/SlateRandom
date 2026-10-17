@@ -1,0 +1,32 @@
+朗读提供商协议核对：2026-10-13。运行时不请求模型／音色列表、不联网更新预设。
+
+Xiaomi MiMo 官方语音合成文档：
+https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
+官方模型页：
+https://mimo.mi.com/models/en-US/mimo-v2.5-tts
+MiMo 官方 SDK 示例源码（仅核验协议，不安装其 Skill／依赖）：
+https://github.com/XiaomiMiMo/MiMo-Skills/blob/main/skills/mimo-v2-5-tts/scripts/mimo_tts.py
+
+MiMo 使用 OpenAI SDK 兼容的 Chat Completions 端点：
+https://api.xiaomimimo.com/v1/chat/completions
+模型 mimo-v2.5-tts；鉴权 Authorization: Bearer <API key>。
+待合成的姓名仅放在 assistant 消息；用户风格消息可省略。
+非流式 audio.format 为 wav，voice 为官方预置音色 ID。
+响应 choices[0].message.audio.data 为 base64 WAV，转换 Blob 后由浏览器播放。
+预置音色：mimo_default、冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean。
+本点名器默认茉莉；不启用音色克隆、设计或姓名润色。
+
+OpenAI Docs 官方 Create speech 协议：
+https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create
+自定义兼容端点采用 POST /audio/speech，body 为 model、input、voice、response_format。
+本点名器请求 mp3，接受音频二进制响应。Lite 按自建 EdgeTTS 代理的说明填写模型、音色和地址，并由浏览器直接发起请求；不在 Lite 中接入非官方 Edge WebSocket 协议。桌面版默认由 Electron 主进程使用 node-edge-tts 的 Edge TTS WebSocket 客户端合成音频。
+
+所有远程调用仅发送当次姓名。失败默认停止；仅显式选择了支持设备系统语音回退的远程配置时，才回退到设备系统语音。
+请求超时和取消会终止 fetch；换轮会暂停旧 Audio、释放 Blob URL、取消系统语音。
+浏览器直连需要接口支持 CORS。本实现不提供后台代理，不尝试规避跨域限制。
+提供商配置与密钥独立存储于 IndexedDB：rollcall-studio:speech-providers，providers / preferences。
+不进入 DrawCore state、班级 localStorage 或 JSON 备份，也不复用视觉提供商密钥。
+
+桌面版默认系统朗读由 Electron 主进程调用 node-edge-tts（无浏览器依赖的 Edge TTS WebSocket 客户端），渲染器只接收音频字节并负责播放；Lite HTML 不包含该 Node 依赖，系统朗读直接使用浏览器 SpeechSynthesis API。桌面版默认 Edge 合成失败时停止，不回退到浏览器系统朗读；仅显式配置的远程提供商可启用设备系统语音回退。
+
+桌面版默认 Edge 音色固定为晓晓（zh-CN-XiaoxiaoNeural）。缓存键使用实际文本、解析后的 Edge 音色 ID 与实际合成参数；仅按需缓存成功的音频，不预取整班姓名。缓存位于 data/cache/tts，默认上限 64 MiB，按最近使用时间淘汰最久未使用的文件。缓存命中在网络队列外读取，同键请求共享一次合成；存储采用尽力而为的原子写入，取消后的任务不写入缓存。在「功能 → 朗读设置」中点击「清空姓名语音缓存」即可清空。姓名音频缓存不纳入备份或发布归档；Lite 使用浏览器 SpeechSynthesis，不使用该缓存。

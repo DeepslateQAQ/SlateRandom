@@ -1,0 +1,121 @@
+/* The transparent main window paints its shadow and anti-aliased corners in CSS. */
+html[data-desktop-role="main"], html[data-desktop-role="main"] body { background: transparent !important; }
+html[data-desktop-role="main"] .draw-screen {
+  inset: 24px;
+  border-radius: calc(16px + var(--radius-control));
+  overflow: hidden;
+  box-shadow: 0 4px 20px #00000073;
+}
+html[data-desktop-role="main"] dialog::backdrop { background: transparent; }
+/* Chromium does not reliably clip a top-layer ::backdrop, so paint the dim
+   layer inside the rounded desktop surface instead of over its transparent
+   window corners. The native backdrop stays for modal input blocking. */
+html[data-desktop-role="main"] body::before {
+  content: "";
+  position: fixed;
+  inset: 24px;
+  z-index: 20;
+  border-radius: calc(16px + var(--radius-control));
+  background: var(--tone-000c);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms cubic-bezier(.22, .7, .25, 1);
+}
+html[data-desktop-role="main"]:has(dialog[open]) body::before {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Desktop-only surfaces. The offline HTML retains its single-button home. */
+html[data-desktop-role="ball"],html[data-desktop-role="ball"] body {
+  margin:0;overflow:hidden;background:transparent!important;color:var(--ball-text);width:100%;height:100%;
+}
+.floating-ball-window {position:fixed;inset:0;display:flex;align-items:center;padding:6px;touch-action:none;user-select:none;isolation:isolate}
+.floating-ball-surface {position:relative;display:flex;align-items:center;width:64px;height:64px;background:var(--ball-shell);border-radius:32px;overflow:hidden;box-shadow:0 2px 12px #0005;transition:width 480ms var(--ease-move),border-radius 480ms var(--ease-move)}
+.floating-ball-core {position:relative;z-index:2;flex:0 0 64px;width:64px;height:64px;padding:0;border:4px solid var(--ball-border);border-radius:50%;background:var(--color-accent);color:var(--accent-contrast);display:flex;align-items:center;justify-content:center;overflow:visible;cursor:pointer;touch-action:none;outline-offset:-8px;transition:filter 240ms var(--ease-move),transform 240ms var(--ease-move)}
+.floating-ball-core .material-icon {font-size:30px!important;width:1em;height:1em;z-index:1}
+@media(hover:hover){.floating-ball-confirmation button:hover{transform:translateY(-2px);background:#fff1}}
+@media(hover:none){.floating-ball-confirmation button:hover{transform:none;background:transparent}}
+.floating-ball-core.is-hovered{filter:brightness(1.08);box-shadow:none}.floating-ball-core:not(.is-hovered){box-shadow:none}
+/* The 56px green disc stays unchanged. Its progress arc fits in the existing
+   black border, inside the 64px core and the 76px native window at every DPI. */
+.floating-ball-hold-ring {position:absolute;inset:-4px;width:64px;height:64px;overflow:visible;pointer-events:none;transform:rotate(-90deg);opacity:0;transition:opacity 180ms var(--ease-move)}
+.floating-ball-hold-progress {fill:none;stroke:var(--color-accent);stroke-width:2;stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100}
+.floating-ball-core.is-holding .floating-ball-hold-ring {opacity:1}
+.floating-ball-core.is-holding .floating-ball-hold-progress {animation:floating-hold-ring var(--ball-hold-duration,3s) var(--ease-hold) forwards}
+@keyframes floating-hold-ring {from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+.floating-ball-confirmation {display:flex;align-items:center;justify-content:center;gap:7px;flex:0 0 272px;height:64px;opacity:0;transform:translateX(-14px);pointer-events:none;transition:opacity 280ms var(--ease-move),transform 480ms var(--ease-move)}
+.floating-ball-window[data-confirming="true"] .floating-ball-surface {width:336px}
+.floating-ball-window[data-confirming="true"] .floating-ball-confirmation {opacity:1;transform:translateX(0);pointer-events:auto;transition-delay:80ms}
+.floating-ball-confirmation button {width:34px;min-width:34px;height:40px;border:0;padding:0;background:transparent;color:var(--ball-text);display:flex;align-items:center;justify-content:center;transition:color 180ms var(--ease-move),background 180ms var(--ease-move),transform 180ms var(--ease-move)}
+/* Hover is enabled only on devices that actually support hover. */
+.floating-ball-confirmation .floating-confirm-cancel {color:var(--ball-danger)}
+.floating-ball-confirmation .floating-confirm-accept {color:var(--accent-edge)}
+.floating-confirm-text {font-size:12px;line-height:1.4;white-space:nowrap;color:var(--ball-text)}
+.floating-confirm-text strong {font-weight:500}
+.floating-ball-window[data-snap="left"] {padding-left:0}
+.floating-ball-window[data-snap="right"] {padding-right:0;justify-content:flex-end}
+.floating-ball-window[data-snap="left"] .floating-ball-surface {border-radius:0 32px 32px 0;padding-left:6px;width:70px}
+.floating-ball-window[data-snap="right"] .floating-ball-surface {border-radius:32px 0 0 32px;padding-right:6px;width:70px;flex-direction:row-reverse}
+.floating-ball-window[data-snap="left"][data-confirming="true"] .floating-ball-surface,.floating-ball-window[data-snap="right"][data-confirming="true"] .floating-ball-surface {width:342px}
+.floating-ball-window[data-snap="right"] .floating-ball-confirmation {transform:translateX(14px)}
+.floating-ball-window[data-snap="right"][data-confirming="true"] .floating-ball-confirmation {transform:translateX(0)}
+.floating-ball-window[data-dragging="true"] .floating-ball-core {cursor:grabbing;transform:scale(.96)}
+.floating-ball-error {position:absolute;inset:auto 6px 0;margin:0;padding:2px;font-size:10px;color:var(--ball-danger);background:var(--ball-shell);max-height:32px;overflow:hidden}
+
+/* 24 px surface inset + 16 px inset from the rounded surface. */
+.desktop-close-main {position:fixed;left:40px;bottom:40px;z-index:11;display:inline-flex;align-items:center;width:var(--home-action-height,84px);min-width:var(--home-action-height,84px);height:var(--home-action-height,84px);min-height:var(--home-action-height,84px);padding:0;border:0;border-radius:var(--radius-control);background:transparent;color:var(--stage-danger);white-space:nowrap;transition:width 420ms var(--ease-move),box-shadow 280ms var(--ease-move)}
+.desktop-close-main>.desktop-close-trigger {position:relative;isolation:isolate;display:flex;align-items:center;justify-content:flex-start;gap:0;flex:0 0 100%;height:100%;min-height:var(--home-action-height,84px);min-width:var(--home-action-height,84px);padding:0;border:1px solid transparent;border-radius:inherit;background:transparent;color:color-mix(in srgb,var(--stage-danger) 72%,var(--stage-muted));--button-glow:var(--stage-danger);overflow:hidden;touch-action:none;user-select:none;transition:transform 200ms var(--ease-move),color 240ms var(--ease-move),background-color 240ms var(--ease-move),box-shadow 280ms var(--ease-move),border-color 240ms var(--ease-move)}
+.desktop-close-trigger>.icon {position:relative;z-index:1;display:flex;align-items:center;justify-content:center;flex:0 0 calc(var(--home-action-height,84px) - 2px);width:calc(var(--home-action-height,84px) - 2px);height:100%;font-size:19px}
+.desktop-close-main .action-label {position:relative;z-index:1;display:block;max-width:0;opacity:0;overflow:hidden;color:var(--stage-danger);font-size:12px;transform:translateX(-6px);transition:max-width 420ms var(--ease-move),opacity 240ms var(--ease-move),transform 420ms var(--ease-move)}
+@media(hover:hover){.desktop-close-main:not(.is-confirming):is(:hover,:focus-within,.is-holding) {width:calc(var(--home-action-height,84px) + 56px)}
+ .desktop-close-main:not(.is-confirming)>.desktop-close-trigger:is(:hover,:focus-visible) {background:color-mix(in srgb,var(--stage-danger) 6%,var(--stage-canvas));color:var(--stage-danger);border-color:color-mix(in srgb,var(--stage-danger) 28%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--stage-danger) 13%,transparent),0 0 32px color-mix(in srgb,var(--stage-danger) 6%,transparent)}
+ .desktop-close-main:not(.is-confirming):is(:hover,:focus-within,.is-holding) .action-label {max-width:64px;opacity:1;transform:translateX(0)}}
+.desktop-close-main>.desktop-close-trigger::before {content:"";position:absolute;inset:0;border-radius:inherit;background:color-mix(in srgb,var(--stage-danger) 20%,transparent);transform:scaleX(0);transform-origin:left;pointer-events:none}
+.desktop-close-trigger[data-holding]::before {animation:main-close-hold 500ms var(--ease-hold) forwards}
+.desktop-close-trigger[data-hold-releasing]::before {animation:main-close-retract 260ms var(--ease-move) forwards}
+@keyframes main-close-hold {from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes main-close-retract {from{transform:scaleX(var(--close-progress,0))}to{transform:scaleX(0)}}
+.desktop-close-main.is-confirming {width:min(360px,calc(100vw - 32px));box-shadow:0 0 20px color-mix(in srgb,var(--stage-danger) 8%,transparent)}
+.desktop-close-main.is-confirming>.desktop-close-trigger {flex:0 0 0;width:0;min-width:0;overflow:hidden;opacity:0;visibility:hidden;pointer-events:none;padding:0;border-width:0;box-shadow:none;background:transparent}
+.desktop-close-main.is-confirming>.desktop-close-trigger>.icon {width:0;min-width:0;visibility:hidden}
+.desktop-close-main.is-confirming .action-label {display:none}
+.desktop-main-quit-confirmation {display:flex;align-items:center;justify-content:space-evenly;gap:6px;flex:1;min-width:0;height:100%;opacity:0;visibility:hidden;pointer-events:none;transform:translateX(-12px);transition:opacity 280ms var(--ease-move),transform 420ms var(--ease-move),visibility 280ms var(--ease-move);color:var(--stage-strong)}
+.is-confirming>.desktop-main-quit-confirmation {opacity:1;visibility:visible;pointer-events:auto;transform:translateX(0);transition-delay:60ms;color:var(--stage-strong)}
+.desktop-main-quit-confirmation>span {font-size:11px;line-height:1.5;white-space:nowrap}.desktop-main-quit-confirmation strong {font-weight:500}
+.desktop-main-quit-confirmation>button {display:flex;align-items:center;justify-content:center;flex:0 0 34px;width:34px;min-width:34px;height:44px;min-height:44px;padding:0;border:0;background:transparent;--button-glow:var(--stage-danger)}
+.desktop-main-quit-confirmation>.desktop-main-quit-cancel {color:var(--stage-danger)}
+.desktop-main-quit-confirmation>.desktop-main-quit-accept {color:var(--accent-edge);--button-glow:var(--accent-edge)}
+.desktop-main-quit-error {position:absolute;left:0;bottom:calc(100% + 8px);max-width:320px;padding:6px 10px;background:var(--stage-canvas);color:var(--stage-danger);font-size:11px;white-space:normal}
+.draw-screen[data-render-style="overview"] .home-actions>.desktop-close-main {position:relative;left:auto;bottom:auto;order:-1;flex:0 0 auto;--home-action-height:48px}
+.home-actions:has(>.desktop-close-main.is-confirming)>:not(.desktop-close-main) {opacity:0;pointer-events:none;transition:opacity 240ms var(--ease-move)}
+.draw-screen.is-animating .desktop-close-main,.draw-screen.is-lifecycle .desktop-close-main {opacity:0;visibility:hidden;pointer-events:none}
+.draw-screen[data-render-style="overview"] .desktop-close-main {opacity:1;visibility:visible;pointer-events:auto}
+.desktop-settings {border-top:1px solid var(--tone-ddd);margin-top:20px;padding-top:18px}
+.desktop-settings-heading {display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.desktop-settings-heading h3 {margin:0}
+.desktop-settings-heading>span {font-size:10px;color:var(--tone-777);letter-spacing:.04em}
+.dialog .desktop-setting-row {display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:72px;padding:12px 0;margin:0;border-bottom:1px solid var(--settings-line)}
+.desktop-setting-row>span {display:flex;flex-direction:column;gap:6px}
+.desktop-elevation-method>span {flex:1;min-width:0}
+.elevation-mode-picker {position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));flex:0 0 240px;inline-size:240px;max-inline-size:100%;min-inline-size:0;block-size:36px;margin:0;padding:3px;border:1px solid var(--tone-ddd);border-radius:var(--radius-control);overflow:hidden;background:var(--tone-f4f4f4);isolation:isolate}
+.elevation-mode-picker::before {content:"";position:absolute;z-index:0;inset:3px auto 3px 3px;width:calc((100% - 6px)/3);border-radius:var(--radius-inset-4);background:var(--color-settings-text);transform:translateX(0);transition:transform 180ms var(--ease-move)}
+.elevation-mode-picker:has(>label:nth-child(2)>input:checked)::before {transform:translateX(100%)}
+.elevation-mode-picker:has(>label:nth-child(3)>input:checked)::before {transform:translateX(200%)}
+.elevation-mode-picker>.elevation-mode-option {position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;margin:0;padding:0 10px;color:var(--tone-666);font-size:12px;line-height:1.25;white-space:nowrap;cursor:pointer;user-select:none;transition:color 180ms var(--ease-move)}
+.desktop-settings .elevation-mode-picker>.elevation-mode-option>input[type="radio"] {position:absolute;width:1px;height:1px;min-width:0;min-height:0;margin:0;padding:0;border:0;opacity:0;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden}
+.elevation-mode-picker>.elevation-mode-option:has(input:checked) {color:var(--color-paper)}
+.elevation-mode-picker>.elevation-mode-option:has(input:focus-visible) {outline:2px solid currentColor;outline-offset:-3px}
+.elevation-mode-picker>.elevation-mode-option:not(:has(input:checked)):hover {color:var(--color-settings-text)}
+.elevation-mode-picker:disabled {opacity:.45}.elevation-mode-picker:disabled>.elevation-mode-option {cursor:not-allowed}
+.desktop-setting-row strong {font-size:13px;font-weight:500}
+.desktop-setting-row small {font-size:11px;line-height:1.5;color:var(--tone-666)}
+.desktop-setting-row input.rect-switch {flex:0 0 36px;margin:0}
+.desktop-setting-row:has(input:disabled) small {color:var(--tone-999)}
+.desktop-runtime-status {min-height:18px;margin-top:12px}
+@media(max-width:520px){.dialog .desktop-elevation-method{flex-wrap:wrap;gap:12px}.desktop-elevation-method>span{flex-basis:100%}.elevation-mode-picker{margin-left:auto}}
+@media(prefers-reduced-motion:reduce){.elevation-mode-picker::before,.elevation-mode-picker>.elevation-mode-option{transition:none}}
+@media(prefers-reduced-motion:reduce){.floating-ball-surface,.floating-ball-core,.floating-ball-hold-ring,.floating-ball-confirmation,.floating-ball-confirmation button,.desktop-close-main,.desktop-close-trigger,.desktop-close-main .action-label,.desktop-main-quit-confirmation{transition:none}.floating-ball-core.is-holding .floating-ball-hold-progress,.desktop-close-trigger[data-holding]::before{animation-timing-function:steps(1,end)}}
+
+/* Keep the normal action row centered without giving the fixed close key a transformed containing block. */
+html[data-desktop-role="main"] .draw-screen.has-result:not([data-render-style="overview"]) .home-actions {left:0;right:0;margin-inline:auto;transform:none}

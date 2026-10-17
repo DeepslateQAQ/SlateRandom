@@ -1,0 +1,47 @@
+{
+  "name": "slaterandom",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SlateRandom 岩选 - 更好玩好用的随机抽选",
+  "productName": "SlateRandom 岩选",
+  "main": "src/main/main.cjs",
+  "license": "GPL-3.0-or-later",
+  "author": "DeepslateQAQ",
+  "type": "commonjs",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": "12.11.2"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "check": "vue-tsc --noEmit -p tsconfig.json",
+    "build": "node scripts/build-single.mjs",
+    "test": "node scripts/build-windows-helper.mjs && node --test tests/unit/shared/*.test.cjs tests/unit/renderer/legacy/*.test.cjs tests/unit/main/*.test.cjs tests/unit/main/windows/*.test.cjs tests/unit/main/edge-tts.test.cjs && node --import tsx --test tests/unit/renderer/domain/*.test.ts tests/unit/renderer/platform/*.test.ts tests/unit/renderer/application/*.test.ts tests/unit/renderer/desktop/*.test.ts",
+    "verify": "node scripts/verify-toolchain.mjs",
+    "test:domain": "node --import tsx --test tests/unit/renderer/domain/*.test.ts",
+    "test:platform": "node --import tsx --test tests/unit/renderer/platform/*.test.ts",
+    "test:application": "node --import tsx --test tests/unit/renderer/application/*.test.ts",
+    "desktop:install": "install-electron --no",
+    "desktop:icons": "node scripts/build-icons.mjs",
+    "desktop:dev": "node scripts/dev-desktop.mjs",
+    "desktop:build": "node scripts/package-desktop.mjs"
+  },
+  "dependencies": {
+    "@material/material-color-utilities": "0.4.0",
+    "node-edge-tts": "^1.2.11",
+    "vue": "3.5.44"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@resvg/resvg-js": "2.6.2",
+    "@types/node": "26.6.5",
+    "@vitejs/plugin-vue": "6.0.10",
+    "electron": "44.7.2",
+    "fontkit": "2.0.4",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vite": "7.3.7",
+    "vue-tsc": "3.3.13"
+  }
+}

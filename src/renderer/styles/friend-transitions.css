@@ -1,0 +1,29 @@
+/* Temporary friend staging never changes a seat's persistent seen/current state. */
+.draw-screen.is-friend .draw-stage { opacity:0 }
+.draw-screen.is-friend .live-seat {
+  transition:opacity 320ms ease,border-color 220ms ease,background-color 220ms ease,color 220ms ease,box-shadow 220ms ease;
+}
+.draw-screen.is-friend .live-seat.friend-hidden { opacity:0!important;pointer-events:none }
+.draw-screen.is-friend .live-seat.friend-source:not(.candidate) {
+  opacity:1;border-color:var(--tone-c2e0cd);background:var(--tone-101510);color:var(--tone-f4fff8);
+  box-shadow:0 0 18px var(--tone-d3fce329),inset 0 0 0 1px var(--tone-d3fce31a);
+}
+.draw-screen.is-friend .live-seat.friend-source:not(.candidate) .seat-id { color:var(--tone-b6cabc) }
+.draw-screen.is-friend .live-seat.friend-target:not(.seen):not(.paused) { opacity:1 }
+.friend-emoji-layer { position:absolute;inset:0;z-index:12;pointer-events:none;overflow:hidden }
+.friend-emoji-layer[hidden] { display:none }
+.friend-emoji-anchor {
+  position:absolute;width:var(--friend-emoji-size,56px);height:var(--friend-emoji-size,56px);
+  transform:translate(-50%,-100%);pointer-events:none;
+}
+.friend-emoji {
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;
+  font-size:var(--friend-emoji-size,56px);font-weight:400;line-height:1;letter-spacing:0;
+  filter:drop-shadow(0 2px 7px var(--tone-000b)) drop-shadow(0 0 16px var(--tone-ccebd32b));
+  transform-origin:50% 70%;will-change:transform,opacity;
+}
+@media(prefers-reduced-motion:reduce) {
+  .draw-screen.is-friend .live-seat { transition:none }
+  .friend-emoji { will-change:auto }
+}

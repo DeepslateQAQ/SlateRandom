@@ -1,0 +1,339 @@
+/* Semantic surfaces and shared palette; override tokens to add a theme. */
+:root {
+  --color-paper: #fff;
+  --color-ink: #000;
+  --color-settings-text: #111;
+  --color-accent: #65dc99;
+  --color-danger: #ff5252;
+  --tone-0003: #0003;
+  --tone-0008: #0008;
+  --tone-222: #222;
+  --tone-0002: #0002;
+  --tone-0001: #0001;
+  --tone-f0f0f0: #f0f0f0;
+  --tone-dedede: #dedede;
+  --tone-bd2525: #bd2525;
+  --tone-a21e1e: #a21e1e;
+  --tone-ccc: #ccc;
+  --tone-8b8b8b: #8b8b8b;
+  --tone-555: #555;
+  --tone-999: #999;
+  --tone-666: #666;
+  --tone-d83232: #d83232;
+  --tone-d8323245: #d8323245;
+  --tone-ffadad45: #ffadad45;
+  --tone-ffe2e2: #ffe2e2;
+  --tone-e13c3c: #e13c3c;
+  --tone-c2e0cd: #c2e0cd;
+  --tone-101510: #101510;
+  --tone-f4fff8: #f4fff8;
+  --tone-d3fce329: #d3fce329;
+  --tone-d3fce31a: #d3fce31a;
+  --tone-b6cabc: #b6cabc;
+  --tone-000b: #000b;
+  --tone-ccebd32b: #ccebd32b;
+  --tone-ddd: #ddd;
+  --tone-777: #777;
+  --tone-f8f8f8: #f8f8f8;
+  --tone-eee: #eee;
+  --tone-1112: #1112;
+  --tone-ffffff45: #ffffff45;
+  --tone-0b0b0bcc: #0b0b0bcc;
+  --tone-ffffff18: #ffffff18;
+  --tone-a6a6a6: #a6a6a6;
+  --tone-bbb: #bbb;
+  --tone-b83232: #b83232;
+  --tone-d5d5d5: #d5d5d5;
+  --tone-aaa: #aaa;
+  --tone-090909: #090909;
+  --tone-414141: #414141;
+  --tone-000c: #000c;
+  --tone-303030: #303030;
+  --tone-888: #888;
+  --tone-202020: #202020;
+  --tone-505050: #505050;
+  --tone-e8e8e8: #e8e8e8;
+  --tone-383838: #383838;
+  --tone-242424: #242424;
+  --tone-444: #444;
+  --tone-393939: #393939;
+  --tone-101010: #101010;
+  --tone-292929: #292929;
+  --tone-333: #333;
+  --tone-171717: #171717;
+  --tone-141414: #141414;
+  --tone-d0d0d0: #d0d0d0;
+  --tone-65dc99: var(--color-accent);
+  --tone-071b10: #071b10;
+  --tone-244731: #244731;
+  --tone-f4f4f4: #f4f4f4;
+  --tone-65dc9924: color-mix(in srgb, var(--color-accent) 14.11765%, transparent);
+  --tone-ffffff15: #ffffff15;
+  --tone-080b09: #080b09;
+  --tone-080808: #080808;
+  --tone-ffffff40: #ffffff40;
+  --tone-65dc9950: color-mix(in srgb, var(--color-accent) 31.37255%, transparent);
+  --tone-b7ffd5: #b7ffd5;
+  --tone-65dc9960: color-mix(in srgb, var(--color-accent) 37.64706%, transparent);
+  --tone-65dc9980: color-mix(in srgb, var(--color-accent) 50.19608%, transparent);
+  --tone-65dc9970: color-mix(in srgb, var(--color-accent) 43.92157%, transparent);
+  --tone-65dc9913: color-mix(in srgb, var(--color-accent) 7.45098%, transparent);
+  --tone-65dc991c: color-mix(in srgb, var(--color-accent) 10.98039%, transparent);
+  --tone-adffcf: #adffcf;
+  --tone-b4ffd19c: #b4ffd19c;
+  --tone-65dc99b3: color-mix(in srgb, var(--color-accent) 70.19608%, transparent);
+  --tone-65dc993d: color-mix(in srgb, var(--color-accent) 23.92157%, transparent);
+  --tone-e0ffed29: #e0ffed29;
+  --tone-effffb26: #effffb26;
+  --tone-a3ffc780: #a3ffc780;
+  --tone-65dc999c: color-mix(in srgb, var(--color-accent) 61.17647%, transparent);
+  --tone-65dc996b: color-mix(in srgb, var(--color-accent) 41.96078%, transparent);
+  --tone-adffd1: #adffd1;
+  --tone-b5ffd5: #b5ffd5;
+  --tone-c2ffdcbd: #c2ffdcbd;
+  --tone-65dc99cc: color-mix(in srgb, var(--color-accent) 80.00000%, transparent);
+  --tone-65dc9985: color-mix(in srgb, var(--color-accent) 52.15686%, transparent);
+  --tone-65dc994d: color-mix(in srgb, var(--color-accent) 30.19608%, transparent);
+  --tone-eafff42e: #eafff42e;
+  --tone-effffb24: #effffb24;
+  --tone-deffec73: #deffec73;
+  --tone-ffffff4d: #ffffff4d;
+  --tone-ffffff52: #ffffff52;
+  --tone-ffffff24: #ffffff24;
+  --tone-94f6be: #94f6be;
+  --tone-9dffc3ed: #9dffc3ed;
+  --tone-65dc99c7: color-mix(in srgb, var(--color-accent) 78.03922%, transparent);
+  --tone-b5ffd5cc: #b5ffd5cc;
+  --tone-65dc99a6: color-mix(in srgb, var(--color-accent) 65.09804%, transparent);
+  --tone-65dc9966: color-mix(in srgb, var(--color-accent) 40.00000%, transparent);
+  --tone-80edb0: #80edb0;
+  --tone-b5ffd5b3: #b5ffd5b3;
+  --tone-65dc997a: color-mix(in srgb, var(--color-accent) 47.84314%, transparent);
+  --tone-65dc9996: color-mix(in srgb, var(--color-accent) 58.82353%, transparent);
+  --tone-65dc995c: color-mix(in srgb, var(--color-accent) 36.07843%, transparent);
+  --tone-7ae9aa: #7ae9aa;
+  --tone-b5ffd599: #b5ffd599;
+  --tone-7cebaa: #7cebaa;
+  --tone-b9ffd8bf: #b9ffd8bf;
+  --tone-65dc998f: color-mix(in srgb, var(--color-accent) 56.07843%, transparent);
+  --tone-65dc9952: color-mix(in srgb, var(--color-accent) 32.15686%, transparent);
+  --tone-ffffff08: #ffffff08;
+  --tone-c93838: #c93838;
+  --tone-e15b5b: #e15b5b;
+  --tone-eefbf3: #eefbf3;
+  --tone-65dc9945: color-mix(in srgb, var(--color-accent) 27.05882%, transparent);
+  --tone-65dc990a: color-mix(in srgb, var(--color-accent) 3.92157%, transparent);
+  --tone-000f: #000f;
+  --tone-0004: #0004;
+  --tone-adffcf88: #adffcf88;
+  --tone-cf4949: #cf4949;
+  --stage-canvas: var(--stage-bg);
+  --surface-page: var(--stage-canvas);
+  --settings-canvas: var(--settings-bg);
+  --surface-settings: var(--settings-canvas);
+  --text-page: var(--stage-text);
+  --text-settings: var(--settings-dialog-text);
+
+  /* Appearance tokens. The runtime <style> overrides accent and radius-ui. */
+  --accent: var(--color-accent);
+  --accent-contrast: #0b0f0c;
+  --accent-edge: color-mix(in srgb, var(--accent) 72%, var(--stage-text));
+  --radius-ui: 8px;
+  --radius-control: var(--radius-ui);
+  --radius-seat: calc(var(--radius-ui) * 1.5);
+  --radius-dialog: calc(var(--radius-ui) * 2);
+  --radius-inset-4: max(0px, calc(var(--radius-control) - 4px));
+  --radius-inset-7: max(0px, calc(var(--radius-control) - 7px));
+
+  /* Stage = classic dark home screen. */
+  --stage-bg: #000;
+  --stage-text: #fff;
+  --stage-muted: #aaa;
+  --stage-faint: #777;
+  --stage-strong: #eee;
+  --stage-line: #444;
+  --stage-line-soft: #222;
+  --stage-seat-bg: #000;
+  --stage-seat-border: #777;
+  --stage-seat-text: #eee;
+  --stage-seat-id: #999;
+  --stage-anchor-bg: #080808;
+  --stage-overlay-text: #fff;
+  --stage-overlay-border: #ffffff45;
+  --stage-action-bg: #fff;
+  --stage-action-text: #000;
+  --stage-action-border: #eee;
+  --stage-action-hold: #d5d5d5;
+  --stage-shadow: #000;
+  --stage-danger: #ff5252;
+
+  /* Settings = classic white dialog. */
+  --settings-bg: #fff;
+  --settings-dialog-text: #000;
+  --settings-text: #111;
+  --settings-muted: #666;
+  --settings-faint: #888;
+  --settings-line: #ddd;
+  --settings-line-strong: #aaa;
+  --settings-dialog-border: #d0d0d0;
+  --settings-input: #fff;
+  --settings-hover: #f0f0f0;
+  --settings-strong: #111;
+  --settings-on-strong: #fff;
+  --settings-switch: #f4f4f4;
+  --settings-switch-knob: #777;
+  --settings-placeholder: #777;
+  --settings-danger: #b83232;
+
+  /* Floating ball follows the stage surface. */
+  --ball-shell: #000;
+  --ball-border: #000;
+  --ball-text: #fff;
+  --ball-muted: #ccc;
+  --ball-danger: #ff5252;
+
+  /* Accent aliases override the fixed green tones above. */
+  --tone-65dc99: var(--accent);
+  --tone-071b10: var(--accent-contrast);
+  --tone-244731: color-mix(in srgb, var(--accent-contrast) 72%, var(--accent));
+  --tone-adffcf: var(--accent-edge);
+  --tone-b7ffd5: var(--accent-edge);
+  --tone-94f6be: var(--accent-edge);
+  --tone-80edb0: var(--accent-edge);
+  --tone-7ae9aa: var(--accent-edge);
+  --tone-7cebaa: var(--accent-edge);
+  --tone-adffd1: var(--accent-edge);
+  --tone-b5ffd5: var(--accent-edge);
+  --tone-c2e0cd: var(--accent-edge);
+  --tone-f4fff8: var(--stage-text);
+  --tone-eefbf3: var(--stage-text);
+  --tone-b6cabc: var(--stage-muted);
+  --tone-101510: color-mix(in srgb, var(--accent) 6%, var(--stage-seat-bg));
+  --tone-9dffc3ed: color-mix(in srgb, var(--accent) 62%, var(--stage-text));
+  --tone-b5ffd5cc: color-mix(in srgb, var(--accent) 60%, transparent);
+  --tone-b5ffd5b3: color-mix(in srgb, var(--accent) 70%, transparent);
+  --tone-b5ffd599: color-mix(in srgb, var(--accent) 60%, transparent);
+  --tone-b9ffd8bf: color-mix(in srgb, var(--accent) 72%, transparent);
+  --tone-b4ffd19c: color-mix(in srgb, var(--accent) 61%, transparent);
+  --tone-a3ffc780: color-mix(in srgb, var(--accent) 50%, transparent);
+  --tone-adffcf88: color-mix(in srgb, var(--accent) 55%, transparent);
+  --tone-c2ffdcbd: color-mix(in srgb, var(--accent) 74%, transparent);
+  --tone-e0ffed29: #ffffff29;
+  --tone-effffb26: #ffffff26;
+  --tone-effffb24: #ffffff24;
+  --tone-eafff42e: #ffffff2e;
+  --tone-deffec73: #ffffff73;
+  --tone-d3fce329: color-mix(in srgb, var(--accent) 16%, transparent);
+  --tone-d3fce31a: color-mix(in srgb, var(--accent) 10%, transparent);
+  --tone-ccebd32b: color-mix(in srgb, var(--accent) 17%, transparent);
+  --tone-101010: var(--stage-seat-bg);
+  --tone-080808: var(--stage-anchor-bg);
+  --tone-080b09: var(--stage-seat-bg);
+  --tone-d5d5d5: var(--stage-action-hold);
+  --ease-move: cubic-bezier(.16,1,.3,1);
+  --ease-hold: cubic-bezier(.65,0,.35,1);
+  --ease-release: cubic-bezier(.22,.61,.36,1);
+  --button-depth-hover: 24px;
+  --button-depth-press: 10px;
+}
+
+html[data-stage-theme="light"] {
+  color-scheme: light;
+  --color-ink: var(--stage-bg);
+  --color-paper: var(--stage-text);
+  --stage-bg: #f4f6f3;
+  --stage-text: #101510;
+  --stage-muted: #5f665f;
+  --stage-faint: #7a827a;
+  --stage-strong: #222;
+  --stage-line: #c9cec9;
+  --stage-line-soft: #dfe3df;
+  --stage-seat-bg: #fff;
+  --stage-seat-border: #c9cec9;
+  --stage-seat-text: #222;
+  --stage-seat-id: #6b726b;
+  --stage-anchor-bg: #eef1ed;
+  --stage-overlay-text: #111;
+  --stage-overlay-border: #00000026;
+  --stage-action-bg: #111;
+  --stage-action-text: #fff;
+  --stage-action-border: #111;
+  --stage-action-hold: #3a3a3a;
+  --stage-shadow: #fff;
+  --stage-danger: #c62828;
+  --ball-shell: #f4f6f3;
+  --ball-border: #f4f6f3;
+  --ball-text: #111;
+  --ball-muted: #666;
+  --ball-danger: #b83232;
+}
+
+html[data-settings-theme="dark"] {
+  --settings-bg: #0d0e0d;
+  --settings-dialog-text: #f2f4f2;
+  --settings-text: #f2f4f2;
+  --settings-muted: #a3a8a4;
+  --settings-faint: #7c817d;
+  --settings-line: #2d302d;
+  --settings-line-strong: #5b615c;
+  --settings-dialog-border: #3a3f3a;
+  --settings-input: #121412;
+  --settings-hover: #1b1e1b;
+  --settings-strong: #f2f4f2;
+  --settings-on-strong: #0d0e0d;
+  --settings-switch: #1b1e1b;
+  --settings-switch-knob: #b9bdb9;
+  --settings-placeholder: #6f746f;
+  --settings-danger: #ff7a7a;
+}
+
+html[data-settings-theme="dark"] .dialog { color-scheme: dark; }
+
+/* Existing component rules keep their selectors; their palette aliases resolve
+   against the active surface so classic, light, dark and system stay in one place. */
+.dialog {
+  --color-ink: var(--settings-dialog-text);
+  --color-paper: var(--settings-canvas);
+  --color-settings-text: var(--settings-text);
+  --tone-666: var(--settings-muted);
+  --tone-777: var(--settings-placeholder);
+  --tone-888: var(--settings-faint);
+  --tone-999: var(--settings-faint);
+  --tone-aaa: var(--settings-line-strong);
+  --tone-bbb: var(--settings-line-strong);
+  --tone-ccc: var(--settings-line-strong);
+  --tone-ddd: var(--settings-line);
+  --tone-d0d0d0: var(--settings-dialog-border);
+  --tone-222: var(--settings-text);
+  --tone-333: color-mix(in srgb, var(--settings-strong) 82%, var(--settings-bg));
+  --tone-555: var(--settings-muted);
+  --tone-f0f0f0: var(--settings-hover);
+  --tone-f8f8f8: var(--settings-hover);
+  --tone-f4f4f4: var(--settings-switch);
+  --tone-dedede: var(--settings-line-strong);
+  --tone-8b8b8b: var(--settings-line-strong);
+  --tone-090909: var(--settings-canvas);
+  --tone-303030: var(--settings-line);
+  --tone-414141: var(--settings-dialog-border);
+}
+
+.draw-screen {
+  --color-ink: var(--stage-bg);
+  --color-paper: var(--stage-text);
+  --tone-eee: var(--stage-strong);
+  --tone-ddd: var(--stage-strong);
+  --tone-ccc: var(--stage-strong);
+  --tone-bbb: var(--stage-strong);
+  --tone-aaa: var(--stage-muted);
+  --tone-888: var(--stage-muted);
+  --tone-999: var(--stage-faint);
+  --tone-777: var(--stage-faint);
+  --tone-555: var(--stage-faint);
+  --tone-444: var(--stage-line);
+  --tone-222: var(--stage-line-soft);
+}
+
+#app { display: contents; }
+html, body, .draw-screen { background-color: var(--surface-page); color: var(--text-page); }
+.dialog { background-color: var(--surface-settings); color: var(--text-settings); border-radius: var(--radius-dialog); }
+.seat, .live-seat { border-radius: var(--radius-seat); }

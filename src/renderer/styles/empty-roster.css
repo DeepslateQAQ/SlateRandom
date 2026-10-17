@@ -1,0 +1,13 @@
+/* An unconfigured class has no synthetic seats, counts or camera targets. */
+.roster-empty-state {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:260px;padding:36px 20px;text-align:center}
+.roster-empty-state>.material-icon {font-size:32px;color:var(--tone-777)}
+.roster-empty-state h3 {margin:0;font-size:18px;font-weight:500}
+.roster-empty-state p {max-width:400px;color:var(--tone-666);font-size:12px;line-height:1.8}
+.roster-empty-state .btn {margin-top:4px}
+.live-board-empty-notice {position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:32px 24px;text-align:center;pointer-events:none;animation:empty-roster-arrive 480ms var(--ease-move) both}
+.live-board-empty-notice strong {font-size:clamp(20px,3vw,32px);font-weight:400;letter-spacing:.08em;color:var(--color-paper)}
+.live-board-empty-notice p {font-size:12px;line-height:1.8;color:var(--tone-888)}
+.configuration-empty-note {margin:0 0 20px;padding:12px 0 12px 14px;border-left:2px solid var(--color-accent);color:var(--tone-555);font-size:12px;line-height:1.8}
+@keyframes empty-roster-arrive {from{opacity:0;transform:perspective(900px) translateZ(-20px)}to{opacity:1;transform:perspective(900px) translateZ(0)}}
+@media(max-height:520px){.roster-empty-state{min-height:210px;padding:24px 16px}}
+@media(prefers-reduced-motion:reduce){.live-board-empty-notice{animation:none}}

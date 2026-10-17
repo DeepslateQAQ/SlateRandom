@@ -1,0 +1,24 @@
+视觉提供商预设核对：2026-10-12。运行时使用内置预设，不会自动请求模型列表或联网更新。
+DeepSeek deepseek-flash，Chat Completions 图片输入：
+https://api-docs.deepseek.com/guides/vision/
+Kimi 模型列表、API 与视觉输入：
+https://platform.kimi.com/docs/models
+https://platform.kimi.com/docs/guide/kimi-k3-quickstart
+https://platform.kimi.com/docs/guide/kimi-k2-6-quickstart
+https://github.com/MoonshotAI/Kimi-K2.5
+Xiaomi MiMo 图片输入、支持模型和端点：
+https://mimo.mi.com/docs/en-US/quick-start/usage-guide/multimodal-understanding/image-understanding
+OpenAI Docs：指定 GPT-6-Luna / GPT-5.6-Luna，均支持图片输入和 Chat Completions：
+https://developers.openai.com/api/docs/models/gpt-6-luna
+https://developers.openai.com/api/docs/models/gpt-5.6-luna
+https://developers.openai.com/api/docs/guides/images-vision
+Claude 模型、视觉和 Messages：
+https://platform.claude.com/docs/en/models/overview
+https://platform.claude.com/docs/en/build-with-claude/vision
+https://platform.claude.com/docs/en/api/messages/create
+Google Gemini 模型和 GenerateContent 图片输入：
+https://ai.google.dev/gemini-api/docs/models
+https://ai.google.dev/gemini-api/docs/generate-content/image-understanding
+Gemini 2.5 系列按官方文档为已使用过这些模型的旧项目保留，新项目默认 3.8 Flash。
+密钥独立存储于 IndexedDB：rollcall-studio:providers / providers；active 选择存于 preferences。
+提供商配置不会加入 DrawCore state、localStorage 的班级数据或 JSON 班级备份。

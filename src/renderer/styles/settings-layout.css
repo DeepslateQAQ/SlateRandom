@@ -1,0 +1,40 @@
+.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px}.page-heading h2{font-size:22px}.page-description{margin:4px 0 20px;color:var(--tone-666);line-height:1.7}.page-heading .page-description{margin-bottom:0}.page-heading .btn{flex:none}
+#view-roster .config-class{margin-bottom:6px}#view-history>.metrics{margin-bottom:22px}#manualModeField{display:block;margin:16px 0;max-width:360px}#manualModeField select{width:100%;min-height:44px;border:1px solid var(--tone-bbb);padding:8px;background:var(--color-paper);color:var(--color-settings-text)}#modeSettingsError:empty{display:none}
+.settings-tabs{display:flex;gap:0;margin:0;padding:0 24px;border-bottom:1px solid var(--tone-ddd);overflow-x:auto;flex:none}.settings-tabs button{flex:1;min-width:48px;min-height:44px;padding:8px;border:0;border-bottom:2px solid transparent;background:var(--color-paper);color:var(--tone-777);transition:color 180ms cubic-bezier(.2,.7,.3,1),border-color 180ms cubic-bezier(.2,.7,.3,1)}.settings-tabs button[aria-pressed="true"]{color:var(--color-settings-text);border-bottom-color:var(--color-settings-text)}.settings-tabs button:focus-visible{outline-color:var(--color-settings-text)}
+[data-settings-panel]>h3{font-size:16px;margin-bottom:18px}[data-settings-panel] .field-hint{line-height:1.8}#friendManageTargetsBtn{margin-top:18px;white-space:normal;text-align:left}
+.edition-badge{display:inline-flex;align-items:center;padding:3px 7px;border:1px solid currentColor;border-radius:999px;font-size:.42em;letter-spacing:.12em;vertical-align:middle;color:var(--tone-666)}
+@media(max-width:520px){.page-heading{gap:10px}.page-heading h2{font-size:19px}.page-heading .btn{padding-inline:10px;min-width:44px;font-size:12px}.page-description{font-size:12px}.navigation button{padding:10px 6px;gap:5px;font-size:12px}.navigation .icon{font-size:18px;width:18px}.settings-tabs{padding-inline:12px}.settings-tabs button{font-size:12px}.metrics{gap:12px}.metrics dd{font-size:27px}}
+
+/* Six pages share a quiet, responsive navigation instead of nesting system settings in draw rules. */
+.config-dialog[open]{display:flex;flex-direction:column;overflow:hidden}.config-dialog .navigation{flex:0 0 auto;gap:0;justify-content:space-between;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scrollbar-width:none;scrollbar-gutter:auto;-ms-overflow-style:none}
+.config-dialog .navigation::-webkit-scrollbar,.settings-tabs::-webkit-scrollbar{display:none}
+.config-dialog .navigation>button{flex:0 0 auto}
+.config-dialog .config-content{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.settings-tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scrollbar-gutter:auto;overscroll-behavior-inline:contain}
+.settings-tabs button{flex:0 0 auto}
+.config-content>.view{min-width:0}
+#view-general>.desktop-settings{margin-top:0;padding-top:0;border-top:0}
+.settings-info-block{display:flex;align-items:flex-start;gap:14px;padding:18px 0;border-block:1px solid var(--tone-ddd)}
+.settings-info-block>.material-icon{margin-top:3px;color:var(--tone-666)}
+.settings-info-block h3,.settings-info-section h3{font-size:14px;font-weight:500}
+.settings-info-block p,.settings-info-section p{font-size:12px;color:var(--tone-666);line-height:1.9;margin-top:8px}
+.settings-info-section{padding:22px 0;border-bottom:1px solid var(--tone-ddd)}
+.data-location{display:flex;align-items:flex-start;gap:14px;padding:18px 0 20px;border-block:1px solid var(--tone-ddd)}
+.data-location>.material-icon{margin-top:3px;color:var(--tone-666)}
+.data-location>div{min-width:0;flex:1}.data-location h3{font-size:13px;font-weight:500}
+.data-directory-text{font-family:"Cascadia Code",Consolas,monospace;font-size:11px;line-height:1.8;color:var(--tone-666);overflow-wrap:anywhere;margin-top:5px;user-select:text}
+.data-location .field-hint{margin-top:7px}
+.backup-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px 24px;padding:22px 0;border-bottom:1px solid var(--tone-ddd)}
+.backup-copy h3{font-size:14px;font-weight:500}.backup-copy p{font-size:12px;color:var(--tone-666);line-height:1.8;margin-top:5px}
+.backup-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.backup-actions .btn{min-width:100px}
+.dialog .data-secret-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 0 0;margin-bottom:0;min-height:64px}
+.data-secret-row>span{display:flex;flex-direction:column;gap:5px}.data-secret-row strong{font-size:12px;font-weight:500}.data-secret-row small{font-size:11px;color:var(--tone-666);line-height:1.8}
+.data-secret-row input.rect-switch{flex:none;margin:0}.backup-data-status{min-height:20px}.backup-data-status:empty{display:block}
+.data-statistics-heading{margin-top:30px;padding-top:24px;border-top:1px solid var(--tone-ddd)}
+.data-statistics-heading>.page-description{margin-bottom:18px}
+.about-brand{display:flex;align-items:center;gap:18px;padding:8px 0 28px}.about-brand>.material-icon{font-size:42px;min-width:42px;color:var(--color-settings-text)}
+.about-brand h2{font-size:30px;line-height:1.2;font-weight:500;letter-spacing:-.02em}.about-brand p{font-size:12px;color:var(--tone-666);margin-top:8px;line-height:1.8}
+.about-details{margin:0;border-top:1px solid var(--tone-ddd)}.about-details>div{display:flex;justify-content:space-between;gap:20px;padding:13px 0;border-bottom:1px solid var(--tone-ddd);font-size:12px}.about-details dt{color:var(--tone-666)}.about-details dd{margin:0;text-align:right;overflow-wrap:anywhere}
+.about-friend-links{display:grid;gap:0;margin:10px 0 0;padding:0;list-style:none}.about-friend-links li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--tone-ddd)}.about-friend-links li:last-child{border-bottom:0}.about-friend-logo{width:32px;height:32px;flex:none;border-radius:calc(var(--radius-control) - 2px);object-fit:contain;background:var(--settings-canvas)}.about-friend-links strong{flex:1;font-weight:500}.about-friend-actions{display:inline-flex;align-items:center;gap:6px}.about-friend-actions a{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid var(--settings-line);border-radius:var(--radius-control);color:var(--settings-text);text-decoration:none}.about-friend-actions a:hover{background:var(--settings-hover);border-color:var(--settings-line-strong)}.about-friend-actions a:focus-visible{outline:2px solid var(--settings-text);outline-offset:2px}.about-friend-icon{display:block;width:20px;height:20px}.about-friend-symbols{position:absolute;width:0;height:0;overflow:hidden}
+@media(max-width:700px){.config-dialog .navigation{padding-inline:12px}.config-dialog .navigation>button{min-width:62px;padding-inline:8px;font-size:12px}.config-dialog .navigation .material-icon{font-size:16px;width:16px}.config-dialog .navigation .nav-count{font-size:10px;margin-left:0}.backup-row{grid-template-columns:minmax(0,1fr);gap:12px;padding-block:18px}.backup-actions .btn{flex:1;min-width:112px}.about-brand h2{font-size:27px}}
+@media(max-width:430px){.config-dialog .navigation{padding-inline:6px}.config-dialog .navigation>button{gap:4px;min-width:54px;padding-inline:5px;font-size:11px}.config-dialog .navigation .nav-count{display:none}.config-dialog .navigation .material-icon{font-size:15px;width:15px}.settings-info-block,.data-location{gap:10px}.data-secret-row small{font-size:10px}.about-brand{gap:12px}.about-brand h2{font-size:25px}}

@@ -1,0 +1,86 @@
+name: Windows releases
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Archive corresponding source
+        if: matrix.arch == 'x64'
+        run: git archive --format=zip --prefix=SlateRandom-source/ --output=SlateRandom-source.zip HEAD
+      - name: Upload source ZIP
+        if: matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlateRandom-source
+          path: SlateRandom-source.zip
+          if-no-files-found: error
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - name: Enable pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Electron runtime
+        run: pnpm desktop:install
+      - name: Build Lite HTML
+        run: pnpm build
+      - name: Build Windows package
+        run: pnpm desktop:build -- --arch=${{ matrix.arch }}
+      - name: Rename Lite artifact
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: Copy-Item dist/index.html SlateRandom-Lite.html
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlateRandom-windows-${{ matrix.arch }}
+          path: release/SlateRandom-*-windows-${{ matrix.arch }}.zip
+          if-no-files-found: error
+      - name: Upload Lite HTML
+        if: matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlateRandom-Lite
+          path: SlateRandom-Lite.html
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Attach release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/SlateRandom-*-windows-x64.zip
+            release-assets/SlateRandom-*-windows-arm64.zip
+            release-assets/SlateRandom-Lite.html
+            release-assets/SlateRandom-source.zip
