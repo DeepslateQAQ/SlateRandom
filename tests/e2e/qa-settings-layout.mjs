@@ -175,9 +175,9 @@ try {
   await click('.navigation [data-nav="data"]');
   check('数据页集中设置、名单与全部备份入口及累计统计，密钥导出默认关闭且只出现一组恢复控件', await client.evaluate(() => {
     const page = document.getElementById('view-data');
-    const ids = ['exportSettingsBtn', 'importSettingsBtn', 'settingsBackupFile', 'exportRosterBtn', 'importRosterBtn', 'rosterBackupFile', 'backupBtn', 'restoreBackupBtn', 'backupFile', 'includeSecretsToggle', 'backupDataStatus', 'dataDirectoryText', 'lifetimeStatsMount'];
-    const toggle = document.getElementById('includeSecretsToggle'), style = getComputedStyle(toggle);
-    return !page.hidden && ids.every(id => page.contains(document.getElementById(id)) && document.querySelectorAll('#' + id).length === 1) && !toggle.checked && toggle.getAttribute('role') === 'switch' && style.appearance === 'none' && document.getElementById('backupFile').accept.includes('.slate') && document.getElementById('backupFile').accept.includes('.json');
+    const ids = ['exportSettingsBtn', 'importSettingsBtn', 'settingsBackupFile', 'exportRosterBtn', 'importRosterBtn', 'rosterBackupFile', 'backupBtn', 'restoreBackupBtn', 'sendToDesktopBtn', 'backupFile', 'includeSecretsToggle', 'backupDataStatus', 'dataDirectoryText', 'lifetimeStatsMount'];
+    const toggle = document.getElementById('includeSecretsToggle'), style = getComputedStyle(toggle), send = document.getElementById('sendToDesktopBtn');
+    return !page.hidden && ids.every(id => page.contains(document.getElementById(id)) && document.querySelectorAll('#' + id).length === 1) && !toggle.checked && toggle.getAttribute('role') === 'switch' && style.appearance === 'none' && document.getElementById('backupFile').accept.includes('.slate') && document.getElementById('backupFile').accept.includes('.json') && send.tagName === 'BUTTON' && send.textContent.includes('发送到桌面版') && page.contains(send.closest('.backup-row-all'));
   }));
 
   await click('.navigation [data-nav="roster"]');
@@ -520,6 +520,9 @@ try {
       document.documentElement.dataset.settingsTheme === 'light';
   }, KEY));
 
+  // The desktop edition only renders inside the packaged Electron app, so the
+  // "desktop shows no send button" side is covered by the manual Windows
+  // checklist rather than by stubbing window.slateDesktop in this browser suite.
   check('设置布局浏览器检查没有未处理 JavaScript 异常', client.errors.length === 0);
   const report = { artifactBytes: artifact.length, artifactSha256, completedAt: new Date().toISOString(), checks, runtimeErrors: client.errors, screenshots };
   await writeFile(path.join(output, 'settings-layout-report.json'), JSON.stringify(report, null, 2));
