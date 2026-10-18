@@ -5,8 +5,11 @@ function failure(label, error, fallback) {
   return new Error(`${label}：${detail || fallback}`, error instanceof Error ? { cause: error } : undefined);
 }
 
-async function applyDesktopSettings({ previous, next, applyStartup, persist, relaunch }) {
+async function applyDesktopSettings({ previous, next, applyStartup, applyProtocols, persist, relaunch }) {
   let startupApplied = false, preferencesPersisted = false, cancelled = false;
+  // Protocol writes can partially complete (one scheme per group), so the
+  // compensation runs whenever the step was attempted, not only when it failed.
+  let protocolsAttempted = false;
   const errors = [];
   try {
     if (applyStartup) {
@@ -16,6 +19,11 @@ async function applyDesktopSettings({ previous, next, applyStartup, persist, rel
         throw failure('应用自启动设置失败', outcome?.error, cancelled ? '操作已取消。' : '系统未确认自启动变更。');
       }
       startupApplied = true;
+    }
+    if (applyProtocols) {
+      protocolsAttempted = true;
+      const outcome = await applyProtocols(next);
+      if (outcome?.ok !== true) throw failure('应用协议设置失败', outcome?.error, '系统未确认协议注册变更。');
     }
     persist(next);
     preferencesPersisted = true;
@@ -32,8 +40,15 @@ async function applyDesktopSettings({ previous, next, applyStartup, persist, rel
     errors.push(error instanceof Error ? error : failure('应用桌面设置失败', error, '未知错误。'));
   }
 
-  // Startup and preferences are separate side effects: neither failed compensation
-  // may prevent the other one from being attempted.
+  // Each side effect is separate: no failed compensation may prevent another one.
+  if (protocolsAttempted) {
+    try {
+      const outcome = await applyProtocols(previous);
+      if (outcome?.ok !== true) throw failure('恢复协议设置失败', outcome?.error, '系统未确认协议注册恢复。');
+    } catch (error) {
+      errors.push(failure('协议补偿失败', error, '未知错误。'));
+    }
+  }
   if (startupApplied) {
     try {
       const outcome = await applyStartup(previous);

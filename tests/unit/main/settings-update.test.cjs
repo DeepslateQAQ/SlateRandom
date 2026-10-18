@@ -3,7 +3,7 @@ const { applyDesktopSettings } = require('../../../src/main/settings-update.cjs'
 const previous = Object.freeze({ autostart: false, uac: false, uiAccess: false, autostartElevation: 'uac' });
 const next = Object.freeze({ autostart: true, uac: true, uiAccess: false, autostartElevation: 'task' });
 
-function fixture({ startup = 'ok', persist = 'ok', launch = 'ok', rollbackStartup = 'ok', rollbackPersist = 'ok', changeStartup = true, restart = true } = {}) {
+function fixture({ startup = 'ok', persist = 'ok', launch = 'ok', protocols = 'ok', rollbackStartup = 'ok', rollbackProtocols = 'ok', rollbackPersist = 'ok', changeStartup = true, changeProtocols = false, restart = true } = {}) {
   const calls = [];
   let native = previous, disk = previous;
   function result(mode, success) {
@@ -23,6 +23,10 @@ function fixture({ startup = 'ok', persist = 'ok', launch = 'ok', rollbackStartu
           const outcome = result(target === next ? startup : rollbackStartup, { ok: true });
           if (outcome.ok) native = target;
           return outcome;
+        },
+        applyProtocols: !changeProtocols ? null : async target => {
+          calls.push(target === next ? 'protocols-next' : 'protocols-previous');
+          return result(target === next ? protocols : rollbackProtocols, { ok: true });
         },
         persist: target => {
           calls.push(target === next ? 'persist-next' : 'persist-previous');
@@ -121,5 +125,67 @@ test('failed persistence without startup change has nothing to compensate', asyn
   const state = fixture({ changeStartup: false, persist: 'throw' });
   await assert.rejects(state.run(), AggregateError);
   assert.deepEqual(state.calls, ['persist-next']);
+  assert.equal(state.disk, previous);
+});
+
+test('success applies protocols after startup and before persistence and relaunch', async () => {
+  const state = fixture({ changeProtocols: true });
+  assert.deepEqual(await state.run(), { started: true, error: null });
+  assert.deepEqual(state.calls, ['startup-next', 'protocols-next', 'persist-next', 'relaunch']);
+  assert.equal(state.disk, next);
+  assert.equal(state.native, next);
+});
+
+for (const protocols of ['false', 'throw']) for (const changeStartup of [false, true]) {
+  test(`protocols ${protocols} never persists or relaunches and compensates only attempted steps (startup=${changeStartup})`, async () => {
+    const state = fixture({ protocols, changeStartup, changeProtocols: true });
+    await assert.rejects(state.run(), error => {
+      assert.ok(error instanceof AggregateError);
+      assert.equal(error.errors.length, 1);
+      // A thrown step error propagates as-is; a refusal gets the operation label.
+      assert.match(error.message, protocols === 'throw' ? /injected exception/ : /应用协议设置失败/);
+      return true;
+    });
+    assert.deepEqual(state.calls, [
+      ...(changeStartup ? ['startup-next'] : []), 'protocols-next', 'protocols-previous',
+      ...(changeStartup ? ['startup-previous'] : [])
+    ]);
+    assert.equal(state.native, previous);
+    assert.equal(state.disk, previous);
+  });
+}
+
+for (const rollbackProtocols of ['false', 'throw']) {
+  test(`protocol compensation failure (${rollbackProtocols}) lands in the aggregate error`, async () => {
+    const state = fixture({ protocols: 'false', rollbackProtocols, changeProtocols: true });
+    await assert.rejects(state.run(), error => {
+      assert.ok(error instanceof AggregateError);
+      assert.equal(error.errors.length, 2);
+      assert.match(error.message, /应用协议设置失败/);
+      assert.match(error.message, /协议补偿失败/);
+      return true;
+    });
+    assert.deepEqual(state.calls, ['startup-next', 'protocols-next', 'protocols-previous', 'startup-previous']);
+    assert.equal(state.disk, previous);
+  });
+}
+
+test('protocol-only success applies protocols then preferences without startup or relaunch', async () => {
+  const state = fixture({ changeStartup: false, changeProtocols: true, restart: false });
+  assert.deepEqual(await state.run(), { started: false, error: null });
+  assert.deepEqual(state.calls, ['protocols-next', 'persist-next']);
+  assert.equal(state.disk, next);
+  assert.equal(state.native, previous);
+});
+
+test('protocol-only persistence failure compensates the protocol group and nothing else', async () => {
+  const state = fixture({ changeStartup: false, changeProtocols: true, restart: false, persist: 'throw' });
+  await assert.rejects(state.run(), error => {
+    assert.ok(error instanceof AggregateError);
+    assert.equal(error.errors.length, 1);
+    assert.match(error.message, /injected disk failure/);
+    return true;
+  });
+  assert.deepEqual(state.calls, ['protocols-next', 'persist-next', 'protocols-previous']);
   assert.equal(state.disk, previous);
 });
