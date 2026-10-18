@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import brandingBanner from '../../../resources/branding/banner.svg?inline';
 import secrandomLogo from '../../../resources/friends/secrandom.png?inline';
 import iccLogo from '../../../resources/friends/icc.png?inline';
 import type { ApplicationActions } from '../application/controller.js';
@@ -24,6 +25,7 @@ const version = ((): string => {
 
 <template>
   <section id="view-about" class="view" aria-label="关于 SlateRandom 岩选">
+    <img class="about-banner" :src="brandingBanner" alt="">
     <div class="about-brand"><span class="material-icon" aria-hidden="true">shuffle</span><div><h2>SlateRandom 岩选 <span class="edition-badge" v-if="!desktop">LITE</span></h2><p>更好玩好用的随机抽选</p></div></div>
     <dl class="about-details"><div><dt>版本</dt><dd>{{ version }}</dd></div><div><dt>作者</dt><dd><a href="https://github.com/DeepslateQAQ" target="_blank" rel="noopener noreferrer">DeepslateQAQ</a></dd></div><div><dt>开源许可</dt><dd>GPL-3.0-or-later</dd></div><div><dt>应用框架</dt><dd>{{ desktop ? 'Vue · TypeScript · Electron' : 'Vue · TypeScript' }}</dd></div></dl>
     <article class="settings-info-section about-friends">

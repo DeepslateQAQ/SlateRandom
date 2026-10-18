@@ -1,14 +1,8 @@
 <p align="center">
-  <img src="resources/icons/icon-source.png" width="112" height="112" alt="SlateRandom 岩选图标">
+  <img src="resources/branding/banner.svg" alt="SlateRandom 岩选 —— 更好玩好用的随机抽选" width="100%">
 </p>
 
 <h1 align="center">SlateRandom 岩选</h1>
-
-<center>
-  <h3>更好玩好用的随机抽选</h3>
-  给课堂、班会和活动用的随机抽人工具。导入名单，点一下「抽人」，它会从还没被抽到的同学里挑一个。<br>
-  抽选不联网，名单和数据只留在本机。
-</center>
 
 > [!WARNING]
 > 本项目属于「岩酱的奇思妙想」系列，代码主要由人工智能生成并维护。请在使用前充分评估其安全性、可靠性与适用性，并谨慎用于生产环境。
