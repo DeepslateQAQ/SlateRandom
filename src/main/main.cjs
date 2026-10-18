@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, screen, dialog, session, Tray, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, session, Tray, Menu, shell, clipboard } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -19,6 +19,12 @@ const { installDataService } = require('./data-service.cjs');
 const { createZOrderKeeper } = require('./z-order.cjs');
 const { createEdgeTtsService } = require('./edge-tts.cjs');
 const { createBallDrag } = require('./ball-drag.cjs');
+const { parseDrawRequest, hasDrawProtocolScheme } = require('./draw-protocol.cjs');
+const { parseAppProtocol, encodeAppCommand, decodeAppCommand, hasAppProtocolScheme } = require('./app-protocol.cjs');
+const { createProtocolRegistration } = require('./protocol-registration.cjs');
+const { createWindowsProtocolRegistry } = require('./windows/protocol-registry.cjs');
+const { PROTOCOL_GROUPS } = require('./protocol-schemes.cjs');
+const { parseClipboardEnvelope, backupNameAllowed, MAX_BACKUP_BYTES } = require('./backup-import.cjs');
 const flag = name => process.argv.find(value => value.startsWith(name + '='))?.slice(name.length + 1);
 const qaMode = process.argv.includes('--slate-qa'), hidden = process.argv.includes('--slate-hidden');
 const root = path.resolve(__dirname, '../..');
@@ -85,6 +91,12 @@ const privilege = createPrivilegeService({ helperPath, executable: process.execP
 const childPipe = flag('--slate-handoff-pipe'), childToken = flag('--slate-handoff-token');
 const handoffChild = childPipe && childToken ? connectChildHandoff({ pipe: childPipe, token: childToken }) : null;
 const handoffParentPid = Number(flag('--slate-handoff-parent-pid'));
+const protocolRegistration = createProtocolRegistration({
+  store,
+  registry: process.platform === 'win32' ? createWindowsProtocolRegistry({ executable: process.execPath, baseArgs: launchArgs }) : null,
+  platform: process.platform,
+  log
+});
 const windowReady = new WeakMap(), windowIdentity = new WeakMap();
 let main, ball, native = { elevated: false, uiAccess: false }, snap = 'none', confirming = false;
 let quitting = false, pendingSettings = false, opacityRun = 0, ballRun = 0, nativeError = store.warning, windowsReady = false;
@@ -98,9 +110,26 @@ const onboardingPendingAtLaunch = (() => {
   try { return needsOnboarding(portableStore.load(), { migrated: dataLocation.migrated }); }
   catch { return false; }
 })();
+// A protocol call is an intent, not an immediate action: it is remembered here
+// and consumed once the windows, the tray and the renderer contract exist.
+const protocolRequest = parseDrawRequest(process.argv);
+let pendingExternalDraw = protocolRequest && settings.externalDrawProtocols ? protocolRequest : null;
+if (settings.externalDrawProtocols && process.argv.includes('--slate-protocol-draw')) {
+  pendingExternalDraw = pendingExternalDraw || { protocol: 'relaunch', route: '' };
+}
+const appProtocolRequest = parseAppProtocol(process.argv);
+let pendingAppQueue = appProtocolRequest && settings.slaterandomProtocol ? [appProtocolRequest] : [];
+const relaunchCommand = process.argv.find(value => value.startsWith('--slate-app-command='));
+if (relaunchCommand && settings.slaterandomProtocol) {
+  const command = decodeAppCommand(relaunchCommand.slice('--slate-app-command='.length));
+  if (command) pendingAppQueue.push(command);
+}
+let appProtocolReady = false, drawTriggerPending = false, protocolActivationRunning = false;
 let showMainRequested = process.argv.includes('--slate-show-main')
   || settings.showFloatingBall === false
-  || onboardingPendingAtLaunch;
+  || onboardingPendingAtLaunch
+  || Boolean(pendingExternalDraw)
+  || pendingAppQueue.some(appCommandNeedsMain);
 // Electron's setPosition can feed its adjusted GetBounds size back into the
 // Windows move operation at fractional DPI. Always use the intended ball size.
 function positionBall(win, x, y) { win.setBounds({ x, y, width: G.BALL_SIZE, height: G.BALL_SIZE }); }
@@ -117,7 +146,7 @@ const ballDrag = createBallDrag({ getWindow: () => ball, screen, positionWindow:
 log('process-start', { handoff: Boolean(handoffChild), showMain: process.argv.includes('--slate-show-main'), onboardingPending: onboardingPendingAtLaunch, softwareRendering });
 if (!handoffChild && !app.requestSingleInstanceLock()) { app.quit(); }
 else {
-  app.on('second-instance', () => { showMainRequested = true;if (windowsReady) void openMain(); });
+  app.on('second-instance', (_event, argv = []) => handleSecondInstance(argv));
   app.whenReady().then(start).catch(error => {
     log('startup-failed', { error: error.message, code: error.code });
     handoffChild?.dispose(); quitting = true;
@@ -215,13 +244,17 @@ function applyBallShape(win) {
   const { width, height } = win.getContentBounds();
   win.setShape(ballShape({ width, height, snap, confirming }));
 }
-async function replaceInstance(uiAccess, showMain) {
+async function replaceInstance(uiAccess, showMain, protocolDraw = false, appCommand = null) {
   let handoff;
   try {
     handoff = await createParentHandoff({ releaseLock: () => app.releaseSingleInstanceLock(), acquireLock: () => app.requestSingleInstanceLock() });
     log('relaunch-requested', { uiAccess, showMain });
     const args = [...launchArgs, '--slate-relaunched', ...handoff.args, '--slate-handoff-parent-pid=' + process.pid];
     if (showMain) args.push('--slate-show-main');
+    // The child cannot see what the parent already consumed, so an outstanding
+    // protocol intent travels as a re-encoded command, never as a raw URL.
+    if (protocolDraw) args.push('--slate-protocol-draw');
+    if (appCommand) args.push('--slate-app-command=' + encodeAppCommand(appCommand));
     // The child cannot see that this launch migrated an old profile, so carry the
     // decision over; otherwise an upgraded user would start on the main window.
     if (dataLocation.migrated) args.push('--slate-data-migrated');
@@ -249,9 +282,39 @@ async function start() {
   const requestUac = process.argv.includes('--slate-startup') || settings.manualElevation === 'uac';
   const needsPrivilege = (settings.uac && requestUac && !native.elevated && !native.uiAccess) || (settings.uiAccess && !native.uiAccess);
   if (!qaMode && needsPrivilege && !process.argv.includes('--slate-relaunched')) {
-    const result = await replaceInstance(settings.uiAccess, showMainRequested);
+    const result = await replaceInstance(settings.uiAccess, showMainRequested, Boolean(pendingExternalDraw), pendingAppQueue[0] || null);
     if (result.started) { log('relaunch-parent-exit');quitting = true;app.quit();return; }
     nativeError = result.cancelled ? 'UAC 授权已取消，当前使用普通置顶。' : result.error;
+  }
+  // Reconcile each group independently: a failure disables only its own switch,
+  // and the main window still appears because the protocol really was invoked.
+  if (!qaMode) {
+    const errors = [];
+    for (const [group, wanted, key] of [
+      ['external', settings.externalDrawProtocols, 'externalDrawProtocols'],
+      ['app', settings.slaterandomProtocol, 'slaterandomProtocol']
+    ]) {
+      const entries = store.protocols?.entries;
+      const hasBackups = Boolean(entries && PROTOCOL_GROUPS[group].some(scheme => entries[scheme]));
+      // A disabled group with nothing to restore must not scan the registry.
+      if (!wanted && !hasBackups) continue;
+      const outcome = await protocolRegistration.apply(group, wanted);
+      if (outcome.ok) continue;
+      const label = group === 'external' ? '外部点名协议' : 'SlateRandom 协议';
+      errors.push(label + '：' + outcome.error);
+      log('protocol-registration-failed', { group, enabled: wanted, error: outcome.error });
+      if (!wanted) continue;
+      const rollback = await protocolRegistration.apply(group, false);
+      if (!rollback.ok) errors.push(label + '：恢复原协议失败：' + rollback.error);
+      settings = patchSettings(settings, { [key]: false });
+      if (group === 'external') pendingExternalDraw = null;
+      else pendingAppQueue = [];
+    }
+    if (errors.length) {
+      nativeError = errors.join('；');
+      try { store.write(settings); }
+      catch (error) { nativeError += '；保存设置失败：' + error.message; }
+    }
   }
   const display = screen.getPrimaryDisplay();
   const initial = store.ball || { x: display.workArea.x + display.workArea.width - G.BALL_SIZE, y: display.workArea.y + Math.round(display.workArea.height * .46) };
@@ -274,6 +337,14 @@ async function start() {
       else ball.showInactive();
       log('windows-show-check', { main: main.isVisible(), ball: ball.isVisible(), mainOpacity: main.getOpacity(), ballOpacity: ball.getOpacity() });
       if (showMainRequested ? !main.isVisible() || ball.isVisible() : !ball.isVisible()) throw Error('Windows 未显示新实例的界面。');
+    }
+    // The request is consumed once: a later show must never replay the draw, and
+    // drawOnBallClick still decides whether an external call actually picks.
+    if (pendingExternalDraw && (!handoffChild || handoffAccepted)) {
+      const request = pendingExternalDraw;
+      pendingExternalDraw = null;
+      log('protocol-activation', { protocol: request.protocol, route: request.route });
+      await triggerDraw();
     }
     log('windows-visible', { main: main.isVisible(), ball: ball.isVisible() }); broadcast();
   };
@@ -304,6 +375,17 @@ async function start() {
   createTray();
   zOrderKeeper = createZOrderKeeper({ getWindows: () => ({ main, ball }), onError: error => log('z-order-refresh-failed', { error: error.message }) });
   app.once('will-quit', () => zOrderKeeper?.dispose());
+  // Startup commands run after the windows, tray and z-order keeper exist, so an
+  // import picker or a fade can never hold up the first visible frame.
+  if (pendingAppQueue.length) {
+    const commands = pendingAppQueue;
+    pendingAppQueue = [];
+    for (const command of commands) {
+      log('app-protocol-activation', { command: command.command, action: command.action, kind: command.kind, source: command.source });
+      void enqueueAppCommand(command);
+    }
+  }
+  appProtocolReady = true;
 }
 async function openConfiguration() {
   await openMain();
@@ -346,7 +428,7 @@ async function setRendererOpacity(win, value) {
     })()`);
   } catch {}
 }
-async function openMain() {
+async function openMain({ draw = false } = {}) {
   showMainRequested = true;
   if (!windowsReady || !main || main.isDestroyed() || !ball || ball.isDestroyed()) return;
   const display = screen.getDisplayMatching(ball.getBounds());main.setBounds(G.mainBounds(display.workArea));
@@ -361,6 +443,7 @@ async function openMain() {
     ball.hide();broadcast();
     await setRendererOpacity(main, 1);
     if (!main.isDestroyed() && !qaMode) main.focus();
+    if (draw) await triggerDraw();
     return;
   }
   // On Windows 10 a transparent window shown with showInactive and native
@@ -372,6 +455,7 @@ async function openMain() {
   if (main.isDestroyed()) return;
   if (!main.isVisible()) main.show();
   if (!qaMode) main.focus();
+  if (draw) await triggerDraw();
 }
 async function hideMain() {
   showMainRequested = false;
@@ -383,6 +467,170 @@ async function hideMain() {
     if (settings.showFloatingBall) ball.showInactive();
     broadcast();
   }
+}
+/* Protocol intent execution -------------------------------------------------
+   Commands arrive from the OS or from a UIAccess relaunch. The renderer contract
+   is polled, never assumed, and each command runs serially so two calls can
+   never interleave window animations or a draw. */
+let appProtocolQueue = Promise.resolve();
+async function waitForRendererReady() {
+  if (!windowsReady || !main || main.isDestroyed()) return false;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    if (!main || main.isDestroyed()) return false;
+    try {
+      if (await main.webContents.executeJavaScript('window.__slateRendererReady === true') === true) return true;
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  log('renderer-command-timeout');
+  return false;
+}
+async function dispatchRendererEvent(name, detail = {}) {
+  if (!await waitForRendererReady()) return false;
+  const payload = JSON.stringify(detail);
+  try {
+    await main.webContents.executeJavaScript(
+      `document.dispatchEvent(new CustomEvent(${JSON.stringify(name)}, { detail: ${payload} }))`
+    );
+    return true;
+  } catch (error) {
+    log('renderer-event-failed', { name, error: error.message });
+    return false;
+  }
+}
+async function triggerDraw({ force = false } = {}) {
+  if (!force && !settings.drawOnBallClick) return false;
+  if (!windowsReady || !main || main.isDestroyed()) return false;
+  if (drawTriggerPending) return false;
+  drawTriggerPending = true;
+  try {
+    if (!await waitForRendererReady()) return false;
+    const started = await main.webContents.executeJavaScript('(() => window.__slateTriggerDraw?.() === true)()') === true;
+    log('draw-trigger', { started, force });
+    return started;
+  } catch (error) {
+    log('draw-trigger-failed', { error: error.message });
+    return false;
+  } finally { drawTriggerPending = false; }
+}
+/** Only these commands need the main window before they can do their work. */
+function appCommandNeedsMain(command) {
+  if (command.command === 'pick' || command.command === 'import') return true;
+  if (command.command === 'main') return command.action === 'show';
+  if (command.command === 'settings') return command.action !== 'hide';
+  return false; // main hide/toggle, every ball action
+}
+async function consumeExternalDraw() {
+  if (!pendingExternalDraw || protocolActivationRunning) return;
+  protocolActivationRunning = true;
+  const request = pendingExternalDraw;
+  pendingExternalDraw = null;
+  try {
+    log('protocol-activation', { protocol: request.protocol, route: request.route });
+    await openMain();
+    await triggerDraw();
+  } catch (error) { log('protocol-activation-failed', { error: error.message }); }
+  finally { protocolActivationRunning = false; }
+}
+async function executeAppProtocol(command) {
+  // A URL can outlive the setting that enabled it; the stored preference wins.
+  if (!settings.slaterandomProtocol) { log('protocol-ignored', { protocol: 'slaterandom', reason: 'disabled' }); return; }
+  if (command.command === 'pick') { await openMain(); await triggerDraw({ force: true }); return; }
+  if (command.command === 'import') { await openMain(); await requestBackupImport(command); return; }
+  if (command.command === 'main') {
+    if (command.action === 'show') await openMain();
+    else if (command.action === 'hide') await hideMain();
+    else if (main?.isVisible()) await hideMain(); else await openMain();
+    return;
+  }
+  if (command.command === 'settings') {
+    if (command.action === 'show') { await openMain(); await dispatchRendererEvent('slate:settings-command', { action: 'open' }); }
+    else if (command.action === 'hide') { if (main?.isVisible()) await dispatchRendererEvent('slate:settings-command', { action: 'close' }); }
+    else { await openMain(); await dispatchRendererEvent('slate:settings-command', { action: 'toggle' }); }
+    return;
+  }
+  if (command.action === 'show') await updateSettings({ showFloatingBall: true });
+  else if (command.action === 'hide') await updateSettings({ showFloatingBall: false });
+  else if (command.action === 'toggle') await updateSettings({ showFloatingBall: !settings.showFloatingBall });
+  else if (main?.isVisible()) await triggerDraw({ force: true });
+  else await openMain({ draw: true });
+}
+function enqueueAppCommand(command) {
+  appProtocolQueue = appProtocolQueue.then(() => executeAppProtocol(command)).catch(error => {
+    log('app-protocol-failed', { command: command.command, action: command.action, error: error.message });
+  });
+  return appProtocolQueue;
+}
+function handleSecondInstance(argv) {
+  const appCommand = parseAppProtocol(argv);
+  if (appCommand) {
+    if (!settings.slaterandomProtocol) { log('protocol-ignored', { protocol: 'slaterandom', reason: 'disabled' }); return; }
+    if (quitting) { log('protocol-ignored', { protocol: 'slaterandom', reason: 'quit' }); return; }
+    if (appProtocolReady && windowsReady && (!handoffChild || handoffAccepted)) void enqueueAppCommand(appCommand);
+    else {
+      // Startup commands keep priority: the queue drains in arrival order.
+      pendingAppQueue.push(appCommand);
+      if (appCommandNeedsMain(appCommand)) showMainRequested = true;
+    }
+    return;
+  }
+  if (hasAppProtocolScheme(argv)) { log('protocol-ignored', { protocol: 'slaterandom', reason: 'invalid' }); return; }
+  const request = parseDrawRequest(argv);
+  if (request) {
+    if (!settings.externalDrawProtocols) { log('protocol-ignored', { protocol: request.protocol, reason: 'disabled' }); return; }
+    if (quitting) { log('protocol-ignored', { protocol: request.protocol, reason: 'quit' }); return; }
+    if (protocolActivationRunning) { log('protocol-ignored', { protocol: request.protocol, reason: 'busy' }); return; }
+    pendingExternalDraw = request; showMainRequested = true;
+    if (windowsReady && (!handoffChild || handoffAccepted)) void consumeExternalDraw();
+    return;
+  }
+  if (hasDrawProtocolScheme(argv)) { log('protocol-ignored', { protocol: 'external', reason: 'invalid' }); return; }
+  showMainRequested = true;
+  if (windowsReady) void openMain();
+}
+async function protocolNotice(message) {
+  log('protocol-notice', { message });
+  await dispatchRendererEvent('slate:protocol-notice', { message });
+}
+async function readBackupImport(command) {
+  const { kind, source } = command;
+  if (source === 'clipboard') return parseClipboardEnvelope(clipboard.readText(), kind);
+  let filePath, name;
+  if (source === 'picker') {
+    const result = await dialog.showOpenDialog(main, {
+      title: '选择 SlateRandom 备份',
+      properties: ['openFile'],
+      filters: [{ name: 'SlateRandom 备份', extensions: kind === 'all' ? ['slate', 'slatebackup', 'json'] : ['json'] }]
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    filePath = result.filePaths[0];
+    name = path.basename(filePath);
+  } else {
+    if (!path.isAbsolute(command.path)) throw Error('备份路径必须是绝对路径。');
+    filePath = command.path;
+    name = command.name ? path.basename(command.name) : path.basename(filePath);
+  }
+  if (!backupNameAllowed(name, kind)) throw Error('备份文件扩展名不受支持。');
+  let stat;
+  try { stat = await fs.promises.stat(filePath); }
+  catch { throw Error('无法读取备份文件或文件不可访问。'); }
+  if (!stat.isFile()) throw Error('备份路径不是文件。');
+  if (stat.size < 1 || stat.size > MAX_BACKUP_BYTES) throw Error('备份为空或超过 64 MB。');
+  let bytes;
+  try { bytes = await fs.promises.readFile(filePath); }
+  catch { throw Error('无法读取备份文件或文件不可访问。'); }
+  if (!bytes.length || bytes.length > MAX_BACKUP_BYTES) throw Error('备份为空或超过 64 MB。');
+  return { kind, name, bytes };
+}
+/** Reads from the requested source only; the renderer always asks for confirmation. */
+async function requestBackupImport(command) {
+  try {
+    const payload = await readBackupImport(command);
+    if (!payload) return;
+    if (!await waitForRendererReady()) return;
+    main.webContents.send('slate:import-request', { kind: payload.kind, name: payload.name, bytes: new Uint8Array(payload.bytes) });
+  } catch (error) { await protocolNotice(error.message); }
 }
 function applyFloatingBallPreference(show) {
   if (!windowsReady || !ball || ball.isDestroyed()) return;
@@ -424,15 +672,28 @@ async function updateSettings(patch) {
     const next = patchSettings(settings, patch);
     const startupChanged = previous.autostart !== next.autostart || (next.autostart && (previous.uac !== next.uac || previous.autostartElevation !== next.autostartElevation));
     const needsElevation = (next.uac && next.manualElevation === 'uac' && !native.elevated && !native.uiAccess) || (next.uiAccess && !native.uiAccess);
+    // Only the groups the user actually changed are written; an unrelated save
+    // must never rewrite the other group's association.
+    const externalChange = previous.externalDrawProtocols !== next.externalDrawProtocols;
+    const appChange = previous.slaterandomProtocol !== next.slaterandomProtocol;
     const result = await applyDesktopSettings({ previous, next,
       applyStartup: startupChanged ? async target => {
         if (qaMode) throw Error('验证模式不修改开机启动或计划任务。');
         return autostart.apply(target);
       } : null,
+      applyProtocols: externalChange || appChange ? async target => {
+        if (qaMode) return { ok: false, error: '验证模式不修改系统协议注册。' };
+        if (externalChange) {
+          const outcome = await protocolRegistration.apply('external', target.externalDrawProtocols);
+          if (!outcome.ok) return outcome;
+        }
+        if (appChange) return protocolRegistration.apply('app', target.slaterandomProtocol);
+        return { ok: true };
+      } : null,
       persist(target) { store.write(target);settings = store.settings; },
       relaunch: needsElevation ? async target => {
         if (qaMode) throw Error('验证模式不申请 UAC 或 UIAccess。');
-        return replaceInstance(target.uiAccess, true);
+        return replaceInstance(target.uiAccess, true, Boolean(pendingExternalDraw), pendingAppQueue[0] || null);
       } : null });
     nativeError = result.error;
     if (result.started === true) { quitting = true;setTimeout(() => { log('relaunch-parent-exit');app.quit(); }, 120); }
@@ -453,7 +714,12 @@ function registerIpc() {
     if (isPreview(event)) throw Error('交接预览不可修改正式桌面设置。');
     return updateSettings(patch);
   });
-  handle('slate:open-main',null,openMain);handle('slate:hide-main','main',hideMain);
+  ipcMain.handle('slate:open-main', (event, options) => {
+    trusted(event);
+    const draw = Boolean(options && typeof options === 'object' && options.draw === true && !isPreview(event));
+    return openMain({ draw });
+  });
+  handle('slate:hide-main','main',hideMain);
   ipcMain.handle('slate:quit', event => {
     const win = trusted(event);
     if (!(win === ball ? confirming : mainConfirming)) throw Error('请先长按关闭按钮或悬浮球确认退出。');

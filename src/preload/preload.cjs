@@ -9,7 +9,7 @@ const sync = (channel, value) => {
 };
 contextBridge.exposeInMainWorld('slateDesktop', Object.freeze({
   role, state: invoke('slate:state'), updateSettings: patch => ipcRenderer.invoke('slate:settings', patch),
-  openMain: invoke('slate:open-main'), hideMain: invoke('slate:hide-main'), quit: invoke('slate:quit'),
+  openMain: options => ipcRenderer.invoke('slate:open-main', options), hideMain: invoke('slate:hide-main'), quit: invoke('slate:quit'),
   beginQuitConfirmation: invoke('slate:quit-confirmation-open'), endQuitConfirmation: invoke('slate:quit-confirmation-close'),
   data: Object.freeze({
     preview: process.argv.includes('--slate-preview'),
@@ -28,5 +28,11 @@ contextBridge.exposeInMainWorld('slateDesktop', Object.freeze({
     if (typeof callback !== 'function') throw TypeError('A state callback is required.');
     const listener = (_event, state) => callback(state); ipcRenderer.on('slate:state-changed', listener);
     return () => ipcRenderer.removeListener('slate:state-changed', listener);
+  },
+  onImportRequest(callback) {
+    if (typeof callback !== 'function') throw TypeError('A backup callback is required.');
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('slate:import-request', listener);
+    return () => ipcRenderer.removeListener('slate:import-request', listener);
   }
 }));

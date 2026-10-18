@@ -3,6 +3,8 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const { normalizeSettings, patchSettings } = require('../../../src/main/settings.cjs');
+const { encodeAppCommand, decodeAppCommand } = require('../../../src/main/app-protocol.cjs');
+const { FORMAT, VERSION } = require('../../../src/main/backup-import.cjs');
 const entry = path.resolve(__dirname, '../../../src/main/main.cjs');
 const source = fs.readFileSync(entry, 'utf8');
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
@@ -10,9 +12,10 @@ async function until(predicate) {
   for (let tick = 0; tick < 100; tick++) { if (predicate()) return; await new Promise(setImmediate); }
   assert.fail('Mocked main process did not reach the requested lifecycle point.');
 }
+const settle = () => new Promise(resolve => setTimeout(resolve, 30));
 function harness(options = {}) {
-  const appReady = deferred(), status = deferred(), windows = [], ready = new Map(), handlers = new Map(), listeners = new Map(), effects = [], privilegeArgs = [];
-  let disk = normalizeSettings(options.settings), writeCount = 0, clock = 0;
+  const appReady = deferred(), status = deferred(), windows = [], ready = new Map(), handlers = new Map(), listeners = new Map(), effects = [], privilegeArgs = [], protocolCalls = [];
+  let disk = normalizeSettings(options.settings), writeCount = 0, clock = 0, protocols = null;
   const app = Object.assign(new EventEmitter(), {
     isPackaged: options.packaged === true, commandLine: { appendSwitch() {} },
     setName() {}, setAppUserModelId() {}, setPath() {}, getPath: () => '/mock/data',
@@ -25,9 +28,9 @@ function harness(options = {}) {
       this.visible = false; this.destroyed = false; this.alpha = 1;
       this.webContents = Object.assign(new EventEmitter(), {
         mainFrame: { url: '' }, isDestroyed: () => this.destroyed, getURL: () => this.webContents.mainFrame.url,
-        stateSnapshots: [], openHandler: null, setWindowOpenHandler(handler) { this.openHandler = handler; },
-        send(channel, snapshot) { if (channel === 'slate:state-changed') this.stateSnapshots.push(snapshot); },
-        executeJavaScript: async () => true
+        stateSnapshots: [], sent: [], scripts: [], openHandler: null, setWindowOpenHandler(handler) { this.openHandler = handler; },
+        send(channel, payload) { this.sent.push([channel, payload]); if (channel === 'slate:state-changed') this.stateSnapshots.push(payload); },
+        async executeJavaScript(script) { this.scripts.push(script); return true; }
       });
       windows.push(this);
       options.onWindow?.(this, windows.length, app);
@@ -51,6 +54,8 @@ function harness(options = {}) {
   class Tray extends EventEmitter { setToolTip() {} setContextMenu() {} destroy() {} }
   const store = {
     get settings() { return { ...disk }; }, ball: null, warning: null,
+    get protocols() { return protocols === null ? null : JSON.parse(JSON.stringify(protocols)); },
+    set protocols(value) { protocols = value === null || value === undefined ? null : JSON.parse(JSON.stringify(value)); },
     write(target) { effects.push(['persist', target.autostart]); if (options.writeFailure?.(++writeCount)) throw Error('disk denied'); disk = normalizeSettings(target); }, position() {}
   };
   const native = { elevated: false, uiAccess: false, available: true };
@@ -58,11 +63,20 @@ function harness(options = {}) {
     async requestRelaunch() { effects.push('relaunch'); return options.relaunch || { started: false, cancelled: true }; } };
   const mocks = {
     electron: { app, BrowserWindow: Window, ipcMain: { handle: (id, fn) => handlers.set(id, fn), on: (id, fn) => listeners.set(id, fn) }, screen,
-      dialog: { showErrorBox() {}, async showSaveDialog() { throw Error('unexpected file dialog'); } },
+      dialog: { showErrorBox() {}, async showSaveDialog() { throw Error('unexpected file dialog'); },
+        async showOpenDialog() {
+          if (options.openDialog) return await options.openDialog();
+          return options.dialogResult ?? (() => { throw Error('unexpected file dialog'); })();
+        } },
+      clipboard: { readText: () => options.clipboardText ?? '' },
       session: { fromPath: () => ({}) }, Tray,
       Menu: { buildFromTemplate: value => ({ items: value, getMenuItemById: id => value.find(item => item.id === id) }) },
       shell: { openExternal: async url => { effects.push(['external', url]); } } },
-    'node:fs': { mkdirSync() {}, mkdtempSync: () => '/mock/session' },
+    'node:fs': { mkdirSync() {}, mkdtempSync: () => '/mock/session', rmSync() {},
+      promises: {
+        stat(file) { return options.stat ? options.stat(file) : Promise.resolve({ isFile: () => true, size: 16 }); },
+        readFile(file) { return options.readFile ? options.readFile(file) : Promise.resolve(Buffer.from('backup-bytes')); }
+      } },
     './settings.cjs': { createSettingsStore: () => store, patchSettings },
     './privileges.cjs': { createPrivilegeService: config => { if (config?.baseArgs) privilegeArgs.push(config.baseArgs); return privilege; } },
     './handoff.cjs': {
@@ -71,6 +85,10 @@ function harness(options = {}) {
     },
     './window-ready.cjs': { waitForWindowReady(win) { const item = deferred(); ready.set(win, item); if (!options.delayedWindows) item.resolve(); return item.promise; } },
     './diagnostics.cjs': { createNativeLog: () => () => {} },
+    './protocol-registration.cjs': { createProtocolRegistration: () => ({ apply(group, enabled) {
+      protocolCalls.push([group, enabled]);
+      return Promise.resolve(options.protocolApply?.(group, enabled) ?? { ok: true });
+    } }) },
     './ball-shape.cjs': { ballShape: () => [] },
     './portable-location.cjs': { preparePortableLocation: value => ({ directory: value.directory, browserDirectory: '/mock/browser', migrated: options.migrated === true }) },
     './portable-data.cjs': { createPortableStore: () => ({
@@ -94,7 +112,7 @@ function harness(options = {}) {
     if (id.startsWith('./')) return require(path.resolve(path.dirname(entry), id));
     return require(id);
   }, module, path.dirname(entry), entry, process, callback => setImmediate(callback), { now: () => clock += 1000 });
-  return { app, screen, windows, ready, effects, privilegeArgs, store, api: module.exports,
+  return { app, screen, windows, ready, effects, privilegeArgs, protocolCalls, store, api: module.exports,
     start: () => appReady.resolve(), resolveStatus: () => status.resolve(native),
     event(win = module.exports.getWindows().main, url) {
       if (url) win.webContents.mainFrame.url = url;
@@ -498,4 +516,242 @@ test('collapsed display reflow derives the new edge from current position, not t
   assert.equal(ctx.api.state().ball.snap, 'right');
   assert.equal(ball.getBounds().x + ball.getBounds().width, area.x + area.width);
   assert.equal(ball.getBounds().height, 76);
+});
+
+const drawScripts = main => main.webContents.scripts.filter(script => script.includes('__slateTriggerDraw'));
+const protocolEvents = (main, channel) => main.webContents.sent.filter(([name]) => name === channel);
+
+test('default launch reconciles only the enabled app protocol group once', async () => {
+  const ctx = harness();
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  assert.deepEqual(ctx.protocolCalls, [['app', true]]);
+});
+
+test('verification mode never touches the protocol service', async () => {
+  const ctx = harness({ args: ['--slate-qa'] });
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  assert.deepEqual(ctx.protocolCalls, []);
+});
+
+test('cold start pick opens main and forces a draw even when the ball click preference is off', async () => {
+  const ctx = harness({ args: ['slaterandom://pick'] });
+  ctx.start();
+  await until(() => ctx.api.isReady() && ctx.api.getWindows().main.isVisible());
+  const { main, ball } = ctx.api.getWindows();
+  await until(() => drawScripts(main).length === 1);
+  assert.equal(ball.isVisible(), false);
+  assert.equal(ctx.api.state().settings.drawOnBallClick, false);
+});
+
+test('a plain default launch never runs the draw script', async () => {
+  const ctx = harness();
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  await settle();
+  const { main, ball } = ctx.api.getWindows();
+  assert.deepEqual(drawScripts(main), []);
+  assert.equal(ball.isVisible(), true);
+});
+
+test('second-instance main commands toggle native visibility and ignore missing actions', async () => {
+  const ctx = harness();
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  const { main, ball } = ctx.api.getWindows();
+  ctx.app.emit('second-instance', {}, ['slaterandom://main/hide']);
+  await settle();
+  assert.equal(main.isVisible(), false);
+  assert.equal(ball.isVisible(), true);
+  ctx.app.emit('second-instance', {}, ['slaterandom://main/show']);
+  await until(() => main.isVisible() && !ball.isVisible());
+  ctx.app.emit('second-instance', {}, ['slaterandom://main']);
+  await settle();
+  assert.equal(main.isVisible(), true);
+  assert.equal(ball.isVisible(), false);
+});
+
+test('second-instance settings commands open, close and toggle the settings surface', async () => {
+  const ctx = harness();
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  const { main } = ctx.api.getWindows();
+  const command = action => main.webContents.scripts.filter(script =>
+    script.includes(`new CustomEvent("slate:settings-command", { detail: {"action":"${action}"} })`));
+  ctx.app.emit('second-instance', {}, ['slaterandom://settings/show']);
+  await until(() => command('open').length === 1);
+  assert.equal(main.isVisible(), true);
+  ctx.app.emit('second-instance', {}, ['slaterandom://settings/hide']);
+  await until(() => command('close').length === 1);
+  ctx.app.emit('second-instance', {}, ['slaterandom://main/hide']);
+  await until(() => !main.isVisible());
+  ctx.app.emit('second-instance', {}, ['slaterandom://settings/hide']);
+  await settle();
+  assert.equal(command('close').length, 1);
+  ctx.app.emit('second-instance', {}, ['slaterandom://settings/toggle']);
+  await until(() => command('toggle').length === 1);
+  assert.equal(main.isVisible(), true);
+});
+
+test('ball commands update the saved preference and the native ball visibility', async () => {
+  const ctx = harness();
+  ctx.start();
+  await until(() => ctx.api.isReady() && ctx.api.getWindows().ball.isVisible());
+  const { main, ball } = ctx.api.getWindows();
+  ctx.app.emit('second-instance', {}, ['slaterandom://ball/hide']);
+  await until(() => ctx.api.state().settings.showFloatingBall === false && !ball.isVisible());
+  assert.equal(main.isVisible(), false);
+  ctx.app.emit('second-instance', {}, ['slaterandom://ball/show']);
+  await until(() => ctx.api.state().settings.showFloatingBall === true && ball.isVisible());
+  ctx.app.emit('second-instance', {}, ['slaterandom://ball/toggle']);
+  await until(() => ctx.api.state().settings.showFloatingBall === false && !ball.isVisible());
+});
+
+test('ball click opens without drawing when the preference is off, then forces a draw when main is visible', async () => {
+  const ctx = harness();
+  ctx.start();
+  await until(() => ctx.api.isReady() && ctx.api.getWindows().ball.isVisible());
+  const { main } = ctx.api.getWindows();
+  ctx.app.emit('second-instance', {}, ['slaterandom://ball/click']);
+  await until(() => main.isVisible());
+  await settle();
+  assert.deepEqual(drawScripts(main), []);
+  ctx.app.emit('second-instance', {}, ['slaterandom://ball/click']);
+  await until(() => drawScripts(main).length === 1);
+});
+
+test('ball click draws on open when the ball click preference is enabled', async () => {
+  const ctx = harness({ settings: { drawOnBallClick: true } });
+  ctx.start();
+  await until(() => ctx.api.isReady() && ctx.api.getWindows().ball.isVisible());
+  const { main } = ctx.api.getWindows();
+  ctx.app.emit('second-instance', {}, ['slaterandom://ball/click']);
+  await until(() => main.isVisible() && drawScripts(main).length === 1);
+});
+
+test('second-instance app commands are ignored after the protocol preference is disabled', async () => {
+  const ctx = harness({ settings: { slaterandomProtocol: false } });
+  ctx.start();
+  await until(() => ctx.api.isReady() && ctx.api.getWindows().ball.isVisible());
+  const { main, ball } = ctx.api.getWindows();
+  const scriptCount = main.webContents.scripts.length;
+  assert.deepEqual(ctx.protocolCalls, []);
+  ctx.app.emit('second-instance', {}, ['slaterandom://ball/hide']);
+  await settle();
+  assert.equal(ctx.api.state().settings.showFloatingBall, true);
+  assert.equal(ball.isVisible(), true);
+  assert.equal(main.webContents.scripts.length, scriptCount);
+});
+
+test('path import reads an absolute file and forwards name, kind and bytes', async () => {
+  const bytes = Buffer.from('abcdefghijklmnop');
+  const ctx = harness({ stat: () => ({ isFile: () => true, size: bytes.length }), readFile: () => bytes });
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  const { main } = ctx.api.getWindows();
+  ctx.app.emit('second-instance', {}, ['slaterandom://import?kind=all&source=path&path=%2Ftmp%2Fx.slate&name=renamed.slate']);
+  await until(() => protocolEvents(main, 'slate:import-request').length === 1);
+  const payload = protocolEvents(main, 'slate:import-request')[0][1];
+  assert.equal(payload.kind, 'all');
+  assert.equal(payload.name, 'renamed.slate');
+  assert.equal(payload.bytes.byteLength, bytes.length);
+});
+
+test('path import rejects a relative path with a protocol notice', async () => {
+  const ctx = harness();
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  const { main } = ctx.api.getWindows();
+  ctx.app.emit('second-instance', {}, ['slaterandom://import?kind=all&source=path&path=relative.slate']);
+  await until(() => main.webContents.scripts.some(script => script.includes('slate:protocol-notice')));
+  assert.deepEqual(protocolEvents(main, 'slate:import-request'), []);
+});
+
+test('clipboard import accepts a valid envelope and reports an invalid one', async () => {
+  const bytes = Buffer.from('clipboard-backup');
+  const envelope = JSON.stringify({ format: FORMAT, version: VERSION, kind: 'all', name: 'clip.slate', data: bytes.toString('base64') });
+  const valid = harness({ clipboardText: envelope });
+  valid.start();
+  await until(() => valid.api.isReady());
+  const validMain = valid.api.getWindows().main;
+  valid.app.emit('second-instance', {}, ['slaterandom://import?kind=all&source=clipboard']);
+  await until(() => protocolEvents(validMain, 'slate:import-request').length === 1);
+  const payload = protocolEvents(validMain, 'slate:import-request')[0][1];
+  assert.equal(payload.kind, 'all');
+  assert.equal(payload.name, 'clip.slate');
+  assert.equal(payload.bytes.byteLength, bytes.length);
+
+  const invalid = harness({ clipboardText: '{"format":"other"}' });
+  invalid.start();
+  await until(() => invalid.api.isReady());
+  const invalidMain = invalid.api.getWindows().main;
+  invalid.app.emit('second-instance', {}, ['slaterandom://import?kind=all&source=clipboard']);
+  await until(() => invalidMain.webContents.scripts.some(script => script.includes('slate:protocol-notice')));
+  assert.deepEqual(protocolEvents(invalidMain, 'slate:import-request'), []);
+});
+
+test('picker import delivers the chosen file and stays silent when cancelled', async () => {
+  const chosen = harness({ openDialog: async () => ({ canceled: false, filePaths: ['/tmp/x.slate'] }) });
+  chosen.start();
+  await until(() => chosen.api.isReady());
+  const chosenMain = chosen.api.getWindows().main;
+  chosen.app.emit('second-instance', {}, ['slaterandom://import?kind=all&source=picker']);
+  await until(() => protocolEvents(chosenMain, 'slate:import-request').length === 1);
+  const payload = protocolEvents(chosenMain, 'slate:import-request')[0][1];
+  assert.equal(payload.kind, 'all');
+  assert.equal(payload.name, 'x.slate');
+  assert.equal(payload.bytes.byteLength, Buffer.byteLength('backup-bytes'));
+
+  const cancelled = harness({ openDialog: async () => ({ canceled: true, filePaths: [] }) });
+  cancelled.start();
+  await until(() => cancelled.api.isReady());
+  const cancelledMain = cancelled.api.getWindows().main;
+  cancelled.app.emit('second-instance', {}, ['slaterandom://import?kind=all&source=picker']);
+  await until(() => cancelledMain.isVisible());
+  await settle();
+  assert.deepEqual(protocolEvents(cancelledMain, 'slate:import-request'), []);
+  assert.equal(cancelledMain.webContents.scripts.some(script => script.includes('slate:protocol-notice')), false);
+});
+
+test('UIAccess relaunch carries the pending SlateRandom command', async () => {
+  const ctx = harness({ settings: { uac: true, manualElevation: 'uac' }, args: ['slaterandom://pick'],
+    relaunch: { started: false, cancelled: true } });
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  const args = ctx.privilegeArgs.at(-1);
+  const value = args.find(argument => argument.startsWith('--slate-app-command='))?.slice('--slate-app-command='.length);
+  assert.ok(value);
+  assert.deepEqual(decodeAppCommand(value), { command: 'pick' });
+});
+
+test('a relaunched child executes its encoded app command', async () => {
+  const ctx = harness({ args: ['--slate-app-command=' + encodeAppCommand({ command: 'ball', action: 'hide' })] });
+  ctx.start();
+  await until(() => ctx.api.isReady() && ctx.api.state().settings.showFloatingBall === false);
+  assert.equal(ctx.api.getWindows().ball.isVisible(), false);
+});
+
+test('startup app group failure disables the app switch and drops the pending pick', async () => {
+  const ctx = harness({ args: ['slaterandom://pick'],
+    protocolApply: (group, enabled) => group === 'app' && enabled ? { ok: false, error: 'reg denied' } : { ok: true } });
+  ctx.start();
+  await until(() => ctx.api.isReady() && ctx.api.getWindows().main.isVisible());
+  await settle();
+  assert.equal(ctx.api.state().settings.slaterandomProtocol, false);
+  assert.match(ctx.api.state().runtime.error, /reg denied/);
+  assert.deepEqual(ctx.protocolCalls, [['app', true], ['app', false]]);
+  assert.deepEqual(drawScripts(ctx.api.getWindows().main), []);
+  assert.equal(ctx.effects.some(effect => effect[0] === 'persist'), true);
+});
+
+test('startup external group failure leaves the app protocol independently enabled', async () => {
+  const ctx = harness({ settings: { externalDrawProtocols: true },
+    protocolApply: (group, enabled) => group === 'external' && enabled ? { ok: false, error: 'ext denied' } : { ok: true } });
+  ctx.start();
+  await until(() => ctx.api.isReady());
+  assert.equal(ctx.api.state().settings.externalDrawProtocols, false);
+  assert.equal(ctx.api.state().settings.slaterandomProtocol, true);
+  assert.match(ctx.api.state().runtime.error, /ext denied/);
+  assert.deepEqual(ctx.protocolCalls, [['external', true], ['external', false], ['app', true]]);
 });

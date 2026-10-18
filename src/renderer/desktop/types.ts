@@ -10,6 +10,9 @@ export interface DesktopSettings {
   showFloatingBall: boolean;
   manualElevation: 'uac' | 'compatibility';
   autostartElevation: 'uac' | 'task';
+  drawOnBallClick: boolean;
+  externalDrawProtocols: boolean;
+  slaterandomProtocol: boolean;
 }
 
 /** Elevation choices the first-run flow stages before committing them at the end. */
@@ -61,7 +64,7 @@ export interface SlateDesktopBridge {
   readonly role: DesktopRole;
   state(): Promise<DesktopState>;
   updateSettings(patch: Partial<DesktopSettings>): Promise<DesktopState>;
-  openMain(): Promise<void>;
+  openMain(options?: { draw?: boolean }): Promise<void>;
   hideMain(): Promise<void>;
   quit(): Promise<void>;
   beginQuitConfirmation(): Promise<void>;
@@ -83,6 +86,7 @@ export interface SlateDesktopBridge {
   beginConfirmation(): Promise<void>;
   endConfirmation(): Promise<void>;
   subscribe(callback: (state: DesktopState) => void): () => void;
+  onImportRequest(callback: (payload: { kind: 'all' | 'settings' | 'roster'; name: string; bytes: Uint8Array }) => void): () => void;
 }
 
 declare global {

@@ -33,9 +33,9 @@ function checkCredentials(value: unknown): BackupCredentials {
 function desktop(value: unknown): Record<string, unknown> | null {
   if (value == null) return null;
   if (!object(value)) throw new Error('桌面设置格式无效。');
-  const allowed = ['autostart', 'uac', 'uiAccess', 'showFloatingBall', 'manualElevation', 'autostartElevation'];
+  const allowed = ['autostart', 'uac', 'uiAccess', 'showFloatingBall', 'manualElevation', 'autostartElevation', 'drawOnBallClick', 'externalDrawProtocols', 'slaterandomProtocol'];
   if (Object.keys(value).some(key => !allowed.includes(key))) throw new Error('桌面设置包含不支持的字段。');
-  for (const key of ['autostart', 'uac', 'uiAccess', 'showFloatingBall']) if (Object.hasOwn(value, key) && typeof value[key] !== 'boolean') throw new Error('桌面设置格式无效。');
+  for (const key of ['autostart', 'uac', 'uiAccess', 'showFloatingBall', 'drawOnBallClick', 'externalDrawProtocols', 'slaterandomProtocol']) if (Object.hasOwn(value, key) && typeof value[key] !== 'boolean') throw new Error('桌面设置格式无效。');
   if (Object.hasOwn(value, 'autostartElevation') && !['uac', 'task'].includes(String(value.autostartElevation))) throw new Error('自启动提权方式无效。');
   if (Object.hasOwn(value, 'manualElevation') && !['uac', 'compatibility'].includes(String(value.manualElevation))) throw new Error('手动启动提权方式无效。');
   if (value.uiAccess === true && value.uac === false) throw new Error('UIAccess 需要启用 UAC 提权。');
