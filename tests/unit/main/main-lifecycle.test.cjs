@@ -11,7 +11,7 @@ async function until(predicate) {
   assert.fail('Mocked main process did not reach the requested lifecycle point.');
 }
 function harness(options = {}) {
-  const appReady = deferred(), status = deferred(), windows = [], ready = new Map(), handlers = new Map(), listeners = new Map(), effects = [];
+  const appReady = deferred(), status = deferred(), windows = [], ready = new Map(), handlers = new Map(), listeners = new Map(), effects = [], privilegeArgs = [];
   let disk = normalizeSettings(options.settings), writeCount = 0, clock = 0;
   const app = Object.assign(new EventEmitter(), {
     isPackaged: options.packaged === true, commandLine: { appendSwitch() {} },
@@ -64,7 +64,7 @@ function harness(options = {}) {
       shell: { openExternal: async url => { effects.push(['external', url]); } } },
     'node:fs': { mkdirSync() {}, mkdtempSync: () => '/mock/session' },
     './settings.cjs': { createSettingsStore: () => store, patchSettings },
-    './privileges.cjs': { createPrivilegeService: () => privilege },
+    './privileges.cjs': { createPrivilegeService: config => { if (config?.baseArgs) privilegeArgs.push(config.baseArgs); return privilege; } },
     './handoff.cjs': {
       createParentHandoff: async () => ({ args: [], waitForChild: async () => {}, dispose: async () => {} }),
       connectChildHandoff: () => ({ dispose() {}, async handover({ show }) { await show(); } })
@@ -72,8 +72,12 @@ function harness(options = {}) {
     './window-ready.cjs': { waitForWindowReady(win) { const item = deferred(); ready.set(win, item); if (!options.delayedWindows) item.resolve(); return item.promise; } },
     './diagnostics.cjs': { createNativeLog: () => () => {} },
     './ball-shape.cjs': { ballShape: () => [] },
-    './portable-location.cjs': { preparePortableLocation: value => ({ directory: value.directory, browserDirectory: '/mock/browser', migrated: false }) },
-    './portable-data.cjs': { createPortableStore: () => ({ load: () => null, info: () => ({}), readCredentials: () => ({ active: '', records: [] }) }) },
+    './portable-location.cjs': { preparePortableLocation: value => ({ directory: value.directory, browserDirectory: '/mock/browser', migrated: options.migrated === true }) },
+    './portable-data.cjs': { createPortableStore: () => ({
+      // A real installation already finished the first-run flow; tests opt into a fresh one.
+      load: () => { if (options.portableLoadError) throw options.portableLoadError; return options.portableState === undefined ? { version: 1, students: [], settings: { onboardingCompleted: true } } : options.portableState; },
+      info: () => ({}), readCredentials: () => ({ active: '', records: [] })
+    }) },
     './z-order.cjs': { createZOrderKeeper: () => ({ dispose() {} }) },
     './autostart.cjs': { createAutostartService: () => ({ async apply(target) {
       effects.push(['startup', target.autostart]); return options.startup?.(target) || { ok: true };
@@ -90,7 +94,7 @@ function harness(options = {}) {
     if (id.startsWith('./')) return require(path.resolve(path.dirname(entry), id));
     return require(id);
   }, module, path.dirname(entry), entry, process, callback => setImmediate(callback), { now: () => clock += 1000 });
-  return { app, screen, windows, ready, effects, store, api: module.exports,
+  return { app, screen, windows, ready, effects, privilegeArgs, store, api: module.exports,
     start: () => appReady.resolve(), resolveStatus: () => status.resolve(native),
     event(win = module.exports.getWindows().main, url) {
       if (url) win.webContents.mainFrame.url = url;
@@ -401,6 +405,53 @@ test('floating ball preference selects the startup window', async () => {
   await until(() => mainFirst.api.isReady() && mainFirst.api.getWindows().main?.isVisible());
   assert.equal(mainFirst.api.getWindows().main.isVisible(), true);
   assert.equal(mainFirst.api.getWindows().ball.isVisible(), false);
+});
+
+test('a fresh install and an unfinished run show the main window for the first-run flow', async () => {
+  for (const portableState of [null, { version: 1, students: [], settings: { onboardingCompleted: false } }]) {
+    const ctx = harness({ portableState });
+    ctx.start();
+    await until(() => ctx.api.isReady() && ctx.api.getWindows().main?.isVisible());
+    assert.equal(ctx.api.getWindows().main.isVisible(), true);
+    assert.equal(ctx.api.getWindows().ball.isVisible(), false);
+  }
+});
+
+test('a migrated profile, a finished profile and an unreadable state leave the ball first', async () => {
+  // A migrated profile without portable state defers to the renderer, which asks for
+  // the main window itself once it knows the data needs the flow.
+  const migrated = harness({ portableState: null, migrated: true });
+  migrated.start();
+  await until(() => migrated.api.isReady() && migrated.api.getWindows().ball?.isVisible());
+  assert.equal(migrated.api.getWindows().main.isVisible(), false);
+
+  const finished = harness({ portableState: { version: 1, students: [], settings: { onboardingCompleted: true } } });
+  finished.start();
+  await until(() => finished.api.isReady() && finished.api.getWindows().ball?.isVisible());
+  assert.equal(finished.api.getWindows().main.isVisible(), false);
+
+  const unreadable = harness({ portableLoadError: Error('portable state is corrupt') });
+  unreadable.start();
+  await until(() => unreadable.api.isReady() && unreadable.api.getWindows().ball?.isVisible());
+  assert.equal(unreadable.api.getWindows().main.isVisible(), false);
+});
+
+test('an upgrade relaunch carries the migration decision instead of claiming a fresh install', async () => {
+  const relaunchArgs = ctx => ctx.privilegeArgs.at(-1);
+
+  const upgraded = harness({ portableState: null, migrated: true, settings: { uac: true, manualElevation: 'uac' }, relaunch: { started: false, cancelled: true } });
+  upgraded.start();
+  await until(() => upgraded.api.isReady());
+  assert.ok(relaunchArgs(upgraded).includes('--slate-data-migrated'));
+  // The child of an upgrade keeps the ball-first startup the parent chose.
+  assert.equal(upgraded.api.getWindows().main.isVisible(), false);
+  assert.equal(upgraded.api.getWindows().ball.isVisible(), true);
+
+  const fresh = harness({ portableState: null, settings: { uac: true, manualElevation: 'uac' }, relaunch: { started: false, cancelled: true } });
+  fresh.start();
+  await until(() => fresh.api.isReady());
+  assert.equal(relaunchArgs(fresh).includes('--slate-data-migrated'), false);
+  assert.ok(relaunchArgs(fresh).includes('--slate-show-main'));
 });
 
 test('tray checkbox callback toggles the floating ball and stays synchronized with saved preferences', async () => {

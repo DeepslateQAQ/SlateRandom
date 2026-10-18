@@ -14,6 +14,7 @@ const G = require('./geometry.cjs');
 const { ballShape } = require('./ball-shape.cjs');
 const { preparePortableLocation } = require('./portable-location.cjs');
 const { createPortableStore } = require('./portable-data.cjs');
+const { needsOnboarding } = require('./onboarding.cjs');
 const { installDataService } = require('./data-service.cjs');
 const { createZOrderKeeper } = require('./z-order.cjs');
 const { createEdgeTtsService } = require('./edge-tts.cjs');
@@ -39,6 +40,9 @@ const legacyDirectory = flag('--slate-legacy-data') || (!qaData ? path.join(app.
 let dataLocation = { directory, browserDirectory: path.join(directory, 'browser'), migrated: false }, bootstrapError = null;
 try { dataLocation = preparePortableLocation({ directory, legacyDirectory }); }
 catch (error) { bootstrapError = error; }
+// A privilege relaunch inherits the parent's upgrade decision; the child's own
+// location check runs before the parent finished migrating and reports false.
+if (process.argv.includes('--slate-data-migrated')) dataLocation = { ...dataLocation, migrated: true };
 app.setPath('userData', directory);
 const persistentSessionPath = dataLocation.browserDirectory;
 try { fs.mkdirSync(persistentSessionPath, { recursive: true }); }
@@ -88,7 +92,15 @@ let renderingSession = null, handoffAccepted = false;
 let tray = null, trayMenu = null, mainConfirming = false;
 let zOrderKeeper = null;
 let settings = store.settings, autostart = null;
-let showMainRequested = process.argv.includes('--slate-show-main') || settings.showFloatingBall === false;
+// Portable data still unavailable at a mutating step means the renderer shows
+// its recovery surface, so the launch must not claim a first run then.
+const onboardingPendingAtLaunch = (() => {
+  try { return needsOnboarding(portableStore.load(), { migrated: dataLocation.migrated }); }
+  catch { return false; }
+})();
+let showMainRequested = process.argv.includes('--slate-show-main')
+  || settings.showFloatingBall === false
+  || onboardingPendingAtLaunch;
 // Electron's setPosition can feed its adjusted GetBounds size back into the
 // Windows move operation at fractional DPI. Always use the intended ball size.
 function positionBall(win, x, y) { win.setBounds({ x, y, width: G.BALL_SIZE, height: G.BALL_SIZE }); }
@@ -102,7 +114,7 @@ const ballDrag = createBallDrag({ getWindow: () => ball, screen, positionWindow:
     const next = G.snapBall(G.confirmBounds(bounds, area, 'none', false), area);
     snap = next.snap;broadcast();await animateBall(next.bounds);
   } });
-log('process-start', { handoff: Boolean(handoffChild), showMain: process.argv.includes('--slate-show-main'), softwareRendering });
+log('process-start', { handoff: Boolean(handoffChild), showMain: process.argv.includes('--slate-show-main'), onboardingPending: onboardingPendingAtLaunch, softwareRendering });
 if (!handoffChild && !app.requestSingleInstanceLock()) { app.quit(); }
 else {
   app.on('second-instance', () => { showMainRequested = true;if (windowsReady) void openMain(); });
@@ -210,6 +222,9 @@ async function replaceInstance(uiAccess, showMain) {
     log('relaunch-requested', { uiAccess, showMain });
     const args = [...launchArgs, '--slate-relaunched', ...handoff.args, '--slate-handoff-parent-pid=' + process.pid];
     if (showMain) args.push('--slate-show-main');
+    // The child cannot see that this launch migrated an old profile, so carry the
+    // decision over; otherwise an upgraded user would start on the main window.
+    if (dataLocation.migrated) args.push('--slate-data-migrated');
     const service = createPrivilegeService({ helperPath, executable: process.execPath, baseArgs: args, workingDirectory: nativeWorkingDirectory });
     const result = await service.requestRelaunch({ uiAccess });
     if (!result.started) return result;
