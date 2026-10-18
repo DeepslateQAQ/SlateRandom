@@ -12,5 +12,21 @@
   "1.10": { "zh": "方解石", "en": "Calcite" },
   "1.11": { "zh": "黑石", "en": "Blackstone" },
   "1.12": { "zh": "滴水石块", "en": "Dripstone Block" },
-  "1.13": { "zh": "平滑玄武岩", "en": "Smooth Basalt" }
+  "1.13": { "zh": "平滑玄武岩", "en": "Smooth Basalt" },
+  "1.14": { "zh": "石台阶", "en": "Stone Slab" },
+  "1.15": { "zh": "圆石台阶", "en": "Cobblestone Slab" },
+  "1.16": { "zh": "石砖", "en": "Stone Bricks" },
+  "1.17": { "zh": "石砖楼梯", "en": "Stone Brick Stairs" },
+  "1.18": { "zh": "苔石", "en": "Mossy Cobblestone" },
+  "1.19": { "zh": "深板岩瓦", "en": "Deepslate Tiles" },
+  "1.20": { "zh": "深板岩瓦台阶", "en": "Deepslate Tile Slab" },
+  "1.21": { "zh": "深板岩瓦楼梯", "en": "Deepslate Tile Stairs" },
+  "1.22": { "zh": "砂岩", "en": "Sandstone" },
+  "1.23": { "zh": "砂岩台阶", "en": "Sandstone Slab" },
+  "1.24": { "zh": "红砂岩楼梯", "en": "Red Sandstone Stairs" },
+  "1.25": { "zh": "平滑砂岩", "en": "Smooth Sandstone" },
+  "1.26": { "zh": "花岗岩台阶", "en": "Granite Slab" },
+  "1.27": { "zh": "闪长岩楼梯", "en": "Diorite Stairs" },
+  "1.28": { "zh": "安山岩台阶", "en": "Andesite Slab" },
+  "1.29": { "zh": "凝灰岩砖楼梯", "en": "Tuff Brick Stairs" }
 }

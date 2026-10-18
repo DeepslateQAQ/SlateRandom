@@ -77,7 +77,7 @@ async function highlight() {
   catch { return ''; }
 }
 
-/** Major.minor codenames come from Minecraft's rock blocks; see codenames.json. */
+/** Major.minor codenames come from Minecraft's rock blocks, slabs and stairs; see codenames.json. */
 async function codename() {
   const minor = version.split('.').slice(0, 2).join('.');
   let table = {};
