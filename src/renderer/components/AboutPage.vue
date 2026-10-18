@@ -10,12 +10,22 @@ withDefaults(defineProps<{
 }>(), { actions: undefined, busy: false, recoveryRequired: false });
 
 const desktop = Boolean(window.slateDesktop);
+
+// The build embeds package.json metadata; the plain development page has none.
+const version = ((): string => {
+  try {
+    const metadata = JSON.parse(document.getElementById('buildMetadata')?.textContent || 'null');
+    return typeof metadata?.appVersion === 'string' ? metadata.appVersion : '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+})();
 </script>
 
 <template>
   <section id="view-about" class="view" aria-label="关于 SlateRandom 岩选">
     <div class="about-brand"><span class="material-icon" aria-hidden="true">shuffle</span><div><h2>SlateRandom 岩选 <span class="edition-badge" v-if="!desktop">LITE</span></h2><p>更好玩好用的随机抽选</p></div></div>
-    <dl class="about-details"><div><dt>版本</dt><dd>1.0.0</dd></div><div><dt>作者</dt><dd><a href="https://github.com/DeepslateQAQ" target="_blank" rel="noopener noreferrer">DeepslateQAQ</a></dd></div><div><dt>开源许可</dt><dd>GPL-3.0-or-later</dd></div><div><dt>应用框架</dt><dd>{{ desktop ? 'Vue · TypeScript · Electron' : 'Vue · TypeScript' }}</dd></div></dl>
+    <dl class="about-details"><div><dt>版本</dt><dd>{{ version }}</dd></div><div><dt>作者</dt><dd><a href="https://github.com/DeepslateQAQ" target="_blank" rel="noopener noreferrer">DeepslateQAQ</a></dd></div><div><dt>开源许可</dt><dd>GPL-3.0-or-later</dd></div><div><dt>应用框架</dt><dd>{{ desktop ? 'Vue · TypeScript · Electron' : 'Vue · TypeScript' }}</dd></div></dl>
     <article class="settings-info-section about-friends">
       <h3>友情链接</h3>
       <p>如果对岩选不够满意，您也可以尝试：</p>
