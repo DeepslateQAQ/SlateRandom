@@ -1,0 +1,16 @@
+{
+  "1.0": { "zh": "石头", "en": "Stone" },
+  "1.1": { "zh": "圆石", "en": "Cobblestone" },
+  "1.2": { "zh": "深板岩", "en": "Deepslate" },
+  "1.3": { "zh": "深板岩圆石", "en": "Cobbled Deepslate" },
+  "1.4": { "zh": "平滑石", "en": "Smooth Stone" },
+  "1.5": { "zh": "花岗岩", "en": "Granite" },
+  "1.6": { "zh": "闪长岩", "en": "Diorite" },
+  "1.7": { "zh": "安山岩", "en": "Andesite" },
+  "1.8": { "zh": "凝灰岩", "en": "Tuff" },
+  "1.9": { "zh": "玄武岩", "en": "Basalt" },
+  "1.10": { "zh": "方解石", "en": "Calcite" },
+  "1.11": { "zh": "黑石", "en": "Blackstone" },
+  "1.12": { "zh": "滴水石块", "en": "Dripstone Block" },
+  "1.13": { "zh": "平滑玄武岩", "en": "Smooth Basalt" }
+}

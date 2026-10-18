@@ -70,14 +70,25 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
+      - name: Compose release notes
+        id: notes
+        run: |
+          node scripts/release-notes.mjs --tag "$GITHUB_REF_NAME" --assets release-assets --out release-notes.md
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
       - name: Attach release assets
         uses: softprops/action-gh-release@v2
         with:
+          name: SlateRandom 岩选 ${{ steps.notes.outputs.version }}
+          body_path: release-notes.md
           fail_on_unmatched_files: true
           files: |
             release-assets/SlateRandom-*-windows-x64.zip
