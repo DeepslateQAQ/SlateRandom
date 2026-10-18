@@ -13,13 +13,18 @@ export interface AppSnapshot {
   swapFirst: string | null;
   modeError: string;
   validationRevision: number;
+  /** False until the controller has loaded stored data and published once. */
+  booted: boolean;
+  /** The first-run flow owns the window right now. */
+  onboarding: boolean;
 }
 
 /** Publish immutable snapshots at command boundaries; animation frames stay outside Vue. */
 export function createAppStore(initial: ClassState) {
   const snapshot = shallowRef<AppSnapshot>({ state: engine.clone(initial), busy: false,
     saveError: '', recoveryRequired: false,
-    view: 'dashboard', swapMode: false, swapFirst: null, modeError: '', validationRevision: 0 });
+    view: 'dashboard', swapMode: false, swapFirst: null, modeError: '', validationRevision: 0,
+    booted: false, onboarding: false });
   return {
     snapshot: shallowReadonly(snapshot),
     publish(next: AppSnapshot): void {

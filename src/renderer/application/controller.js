@@ -24,17 +24,25 @@ export function mountController({ store, repository, filePort, fullscreenPort })
   let referenceSheets = [], referenceReadVersion = 0, referenceLoading = false;
   let recognitionController = null, recognitionBusy = false, historyPage = 0, confirmAction = null, toastTimer = null, toastHost = null;
   let loadWarning = '', saveError = '', recoveryRequired = false, resultVisible = false, drawCommitted = false, drawingMode = null, settling = false, sceneActive = false, followCamera = false, cameraTarget = null, cameraAnchor = null, cameraScale = 1;
+  // The first-run flow belongs to the finished window, never to a handoff preview.
+  const preview = window.slateDesktop?.data?.preview === true;
+  let booted = false, onboardingDismissed = false, onboardingSuppressed = false;
   let directionNotice = null, directionNoticeTimer = null, directionNoticeHideTimer = null;
   let friendCameraGroup = null;
   $('imageFileLabel').insertAdjacentHTML('afterend', referenceMarkup);
   const loaded = repository.load(state); state = loaded.state; loadWarning = loaded.warning;
-  saveError = loaded.saveError || loaded.warning || ''; recoveryRequired = !!loaded.recoveryRequired;
+  const loadedSaveError = loaded.saveError || '';
+  saveError = loadedSaveError || loaded.warning || ''; recoveryRequired = !!loaded.recoveryRequired;
   const initial = recoveryRequired ? state : migrateAutomaticDemo(state);
   if (initial !== state) {
     state = initial;
     try { repository.save(state); }
     catch (error) { saveError = error.message || '演示名单已移除，请导入实际名单；本机存储暂不可用。'; loadWarning = saveError; }
   }
+  // A read or write problem means the flag cannot be trusted yet: show the
+  // existing save warning instead of asking for a first-run configuration.
+  onboardingSuppressed = Boolean(loadWarning || loadedSaveError);
+  booted = true;
   resultVisible = state.history.length > 0;
   function toast(message) {
     const host = window.DialogTransitions.topModal()?.querySelector('[data-toast-host]') || $('toast');
@@ -54,10 +62,21 @@ export function mountController({ store, repository, filePort, fullscreenPort })
       syncSaveStatus(); publish(); toast(saveError); return false;
     }
   }
+  function persistOnboarding(value) {
+    const previous = state.settings;
+    state.settings = C.settings({ ...state.settings, onboardingCompleted: value });
+    try { repository.save(state); saveError = ''; syncSaveStatus(); return true; }
+    catch (error) {
+      state.settings = previous;
+      saveError = error.message || '本机存储不可用或空间不足，请导出备份保存本次记录。';
+      syncSaveStatus(); publish(); toast(saveError); return false;
+    }
+  }
   function readOnlyAvailable() {
     if (!busy) return true;
     toast('正在处理数据或揭晓结果，请稍等片刻。'); return false;
   }
+
   function available({ allowRecovery = false } = {}) {
     if (!readOnlyAvailable()) return false;
     if (!recoveryRequired || allowRecovery) return true;
@@ -233,8 +252,13 @@ export function mountController({ store, repository, filePort, fullscreenPort })
     $('resetDrawBtn').hidden = !state.students.length || !isOverview() && (!resultVisible || !state.history.length);
     $('resetDrawBtn').disabled = busy || recoveryRequired;
   }
+  function onboardingActive() {
+    return booted && !preview && !recoveryRequired && !onboardingDismissed
+      && !onboardingSuppressed
+      && state.settings.onboardingCompleted === false;
+  }
   function publish() {
-    store.publish({ state, busy, view, swapMode, swapFirst, modeError, validationRevision, saveError, recoveryRequired });
+    store.publish({ state, busy, view, swapMode, swapFirst, modeError, validationRevision, saveError, recoveryRequired, booted, onboarding: onboardingActive() });
     void nextTick(() => window.FriendSeatConfig.sync());
   }
   
@@ -586,6 +610,9 @@ export function mountController({ store, repository, filePort, fullscreenPort })
   async function restoreData(parsed) {
     invalidatePendingReads();
     const next = parsed.kind === 'all' ? C.restoreState(parsed.state) : parsed.kind === 'settings' ? applySettingsBackup(state, parsed.settings) : applyRosterBackup(state, parsed.roster);
+    // A full or settings backup brings the user's own configuration, which ends a
+    // first run; a roster-only backup is just a roster, so the flow keeps going.
+    if (parsed.kind !== 'roster') next.settings.onboardingCompleted = true;
     if (parsed.kind === 'roster') {
       // A roster-only import never writes credentials or resets matched statistics.
       acceptRestoredData(next);
@@ -597,33 +624,38 @@ export function mountController({ store, repository, filePort, fullscreenPort })
     // UAC/UIAccess may restart the process, so apply desktop changes last.
     if (parsed.kind !== 'roster') await applyDesktopBackup(parsed.desktopSettings);
   }
+  async function importBackupFile(file, kind) {
+    const allowRecovery = kind === 'all';
+    if (!file || !available({ allowRecovery })) return;
+    try {
+      if (file.size > BACKUP_LIMIT * 2) throw new Error('备份文件超过 64 MB。');
+      const parsed = await readBackup(await file.arrayBuffer(), kind);
+      if (kind === 'all') parsed.repairCredentials = await inspectCredentialRepair(parsed.credentials);
+      const title = { all: '恢复全部数据', settings: '导入设置', roster: '导入名单' }[kind];
+      const description = kind === 'all' ? '将恢复「' + parsed.state.className + '」的 ' + parsed.state.students.length + ' 位同学、' + parsed.state.round + ' 轮进度及其累计公平统计，替换当前数据。'
+        : kind === 'settings' ? '将替换外观、抽选规则、概率与提供商配置。名单、累计公平统计与当前进度保留。'
+        : '将导入「' + parsed.roster.className + '」的 ' + parsed.roster.students.length + ' 位同学及座位、友尽目标。同名同学的累计公平统计保留。';
+      dataStatus('备份核对完成，等待确认。');
+      const repairWarning = parsed.repairCredentials ? ' 原提供商配置无法读取，将使用备份中的配置；未备份的密钥需要重新填写。' : '';
+      const keyNotice = kind === 'roster' ? '' : ' 备份未包含的密钥仅在提供商及接口地址均未改变时沿用；接口改变后需重新填写。桌面系统设置将在数据恢复后单独应用。';
+      const incomingSettings = kind === 'all' ? parsed.state.settings
+        : kind === 'settings' ? parsed.settings : null;
+      const externalCss = incomingSettings?.customCssEnabled
+        ? findExternalCssResources(incomingSettings.customCss) : [];
+      const cssWarning = externalCss.length
+        ? ' 备份中的自定义 CSS 会加载外部资源（' + summarizeCssResources(externalCss)
+          + '），可能向对应服务器发送请求。仅在信任来源时继续。'
+        : '';
+      requestConfirm(title, description + repairWarning + keyNotice + cssWarning, kind === 'all' ? '恢复全部' : '确认导入',
+        () => runDataAction(() => restoreData(parsed), { allowRecovery }), { allowRecovery });
+    } catch (error) { dataStatus('无法读取备份：' + error.message); toast(error.message); }
+  }
   function installBackupImport(buttonId, inputId, kind) {
     const allowRecovery = kind === 'all';
     $(buttonId).addEventListener('click', () => { if (available({ allowRecovery })) $(inputId).click(); });
     $(inputId).addEventListener('change', async event => {
-      const file = event.target.files[0]; event.target.value = ''; if (!file || !available({ allowRecovery })) return;
-      try {
-        if (file.size > BACKUP_LIMIT * 2) throw new Error('备份文件超过 64 MB。');
-        const parsed = await readBackup(await file.arrayBuffer(), kind);
-        if (kind === 'all') parsed.repairCredentials = await inspectCredentialRepair(parsed.credentials);
-        const title = { all: '恢复全部数据', settings: '导入设置', roster: '导入名单' }[kind];
-        const description = kind === 'all' ? '将恢复「' + parsed.state.className + '」的 ' + parsed.state.students.length + ' 位同学、' + parsed.state.round + ' 轮进度及其累计公平统计，替换当前数据。'
-          : kind === 'settings' ? '将替换外观、抽选规则、概率与提供商配置。名单、累计公平统计与当前进度保留。'
-          : '将导入「' + parsed.roster.className + '」的 ' + parsed.roster.students.length + ' 位同学及座位、友尽目标。同名同学的累计公平统计保留。';
-        dataStatus('备份核对完成，等待确认。');
-        const repairWarning = parsed.repairCredentials ? ' 原提供商配置无法读取，将使用备份中的配置；未备份的密钥需要重新填写。' : '';
-        const keyNotice = kind === 'roster' ? '' : ' 备份未包含的密钥仅在提供商及接口地址均未改变时沿用；接口改变后需重新填写。桌面系统设置将在数据恢复后单独应用。';
-        const incomingSettings = kind === 'all' ? parsed.state.settings
-          : kind === 'settings' ? parsed.settings : null;
-        const externalCss = incomingSettings?.customCssEnabled
-          ? findExternalCssResources(incomingSettings.customCss) : [];
-        const cssWarning = externalCss.length
-          ? ' 备份中的自定义 CSS 会加载外部资源（' + summarizeCssResources(externalCss)
-            + '），可能向对应服务器发送请求。仅在信任来源时继续。'
-          : '';
-        requestConfirm(title, description + repairWarning + keyNotice + cssWarning, kind === 'all' ? '恢复全部' : '确认导入',
-          () => runDataAction(() => restoreData(parsed), { allowRecovery }), { allowRecovery });
-      } catch (error) { dataStatus('无法读取备份：' + error.message); toast(error.message); }
+      const file = event.target.files[0]; event.target.value = '';
+      await importBackupFile(file, kind);
     });
   }
   async function exportHistory() {
@@ -686,6 +718,8 @@ export function mountController({ store, repository, filePort, fullscreenPort })
   }
   document.addEventListener('slate:open-settings', () => {
     if (!readOnlyAvailable()) return;
+    // The first-run flow owns the window; the tray must not stack settings on it.
+    if (onboardingActive()) return;
     if ($('configDialog').open) { setView('general'); return; }
     openConfig('general');
   });
@@ -954,6 +988,44 @@ export function mountController({ store, repository, filePort, fullscreenPort })
     changeChance(mode, value) { return commitModeSettings({ [{ direction: "directionChance", time: "timeChance", friend: "friendChance", endJump: "endJumpChance" }[mode]]: value }); },
     strategy(value) { if (!available()) return; state.settings.strategy = value; const saved = save(); render(); if (saved && state.lock) toast('当前方向接力会先完成，之后使用新策略。'); },
     manualMode(value) { return commitModeSettings({ manualMode: value }); },
+    openRosterImport() { if (available()) openImport(); },
+    restoreAllFile(file) { return importBackupFile(file, 'all'); },
+    restoreRosterFile(file) { return importBackupFile(file, 'roster'); },
+    skipOnboarding() {
+      if (!available() || state.settings.onboardingCompleted) return false;
+      if (!persistOnboarding(true)) return false;
+      render();
+      return true;
+    },
+    async finishOnboarding(desktopPatch) {
+      if (!available() || state.settings.onboardingCompleted) return false;
+      // The completion flag is written first: a UAC relaunch during the desktop
+      // step must come back to a main window that no longer asks for setup.
+      if (!persistOnboarding(true)) return false;
+      let elevationError = '';
+      const bridge = desktopBridge();
+      if (bridge && desktopPatch && Object.keys(desktopPatch).length) {
+        try {
+          const updated = await bridge.updateSettings(desktopPatch);
+          elevationError = updated?.runtime?.error || '';
+        } catch (error) { elevationError = error.message || '桌面设置保存失败。'; }
+      }
+      render();
+      // The flow closes on the next flush; asking for the host right now would put
+      // this warning inside the departing dialog.
+      if (elevationError) void nextTick(() => toast('提权设置未生效：' + elevationError));
+      return true;
+    },
+    async restartOnboarding() {
+      if (!available()) return false;
+      await window.DialogTransitions.close($('configDialog'));
+      onboardingDismissed = false;
+      onboardingSuppressed = false;
+      if (!persistOnboarding(false)) return false;
+      render();
+      return true;
+    },
+    dismissOnboardingForSession() { onboardingDismissed = true; render(); },
     updateAppearance(patch) {
       if (!available()) return false;
       const previous = state.settings;

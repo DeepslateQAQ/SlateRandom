@@ -12,6 +12,14 @@ export interface DesktopSettings {
   autostartElevation: 'uac' | 'task';
 }
 
+/** Elevation choices the first-run flow stages before committing them at the end. */
+export interface DesktopDraft {
+  uac: boolean;
+  uiAccess: boolean;
+  manualElevation: DesktopSettings['manualElevation'];
+  autostartElevation: DesktopSettings['autostartElevation'];
+}
+
 export interface DesktopRuntime {
   elevated: boolean;
   uiAccess: boolean;

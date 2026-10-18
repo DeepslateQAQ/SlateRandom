@@ -15,6 +15,7 @@ import type { AppSnapshot, AppStore } from '../../../../src/renderer/application
 import * as initialState from '../../../../src/renderer/application/initial-state';
 import * as pressIntent from '../../../../src/renderer/application/press-intent';
 import type { ApplicationActions, ControllerDependencies } from '../../../../src/renderer/application/controller';
+import type { DesktopSettings } from '../../../../src/renderer/desktop/types';
 
 type Scope = 'vision' | 'speech';
 type Credentials = Required<backup.BackupCredentials>;
@@ -250,6 +251,8 @@ export interface Harness {
   store: AppStore;
   closed: string[];
   downloads: (TextDownload | BinaryDownload)[];
+  desktopUpdates: Partial<DesktopSettings>[];
+  desktopUpdateFlags: (boolean | undefined)[];
   actions: ApplicationActions;
   element(id: string): FakeElement;
   click(id: string): Promise<void>;
@@ -263,10 +266,10 @@ export interface Harness {
   readonly renderStyle: RenderStyleControls;
   overrideLoad(value: LoadOverride | null): void;
 }
-export function harness(options: { native?: 'committed' | 'pending-recovery'; nativeData?: NativeDataAdapter; recovery?: boolean } = {}): Harness {
+export function harness(options: { native?: 'committed' | 'pending-recovery'; nativeData?: NativeDataAdapter; recovery?: boolean; initial?: ClassState } = {}): Harness {
   const injected = options.nativeData;
-  const previous = injected ? copy(injected.loadClass()) : configured(), next = configured('恢复班级', 3), trace: string[] = [], vault = copy(oldCredentials);
-  const dom = new FakeDom(), clock = new Clock(), storage = new FaultStorage(), downloads: (TextDownload | BinaryDownload)[] = [];
+  const previous = options.initial ? copy(options.initial) : injected ? copy(injected.loadClass()) : configured(), next = configured('恢复班级', 3), trace: string[] = [], vault = copy(oldCredentials);
+  const dom = new FakeDom(), clock = new Clock(), storage = new FaultStorage(), downloads: (TextDownload | BinaryDownload)[] = [], desktopUpdates: Partial<DesktopSettings>[] = [], desktopUpdateFlags: (boolean | undefined)[] = [];
   storage.items.set(CLASS_STORAGE_KEY, JSON.stringify(previous));
   const native = options.native ? new NativeData(previous, vault, trace, options.native) : null;
   const adapter: NativeDataAdapter | null = injected || native;
@@ -292,7 +295,8 @@ export function harness(options: { native?: 'committed' | 'pending-recovery'; na
     RenderStyleUI: { init(value: RenderStyleControls) { renderStyleOptions = value; }, sync() {} },
     SeatTransitions: { async enter() {}, async exit() {}, clear() {} }, FriendTransitions: { async play() {}, clear() {} },
     matchMedia: () => ({ matches: true }),
-    ...(adapter ? { slateDesktop: { role: 'main', data: adapter, state: async () => ({ settings: {} }), updateSettings: async () => ({ settings: {} }) } } : {})
+    ...(adapter ? { slateDesktop: { role: 'main', data: adapter, state: async () => ({ settings: {} }),
+      updateSettings: async (patch: Partial<DesktopSettings>) => { desktopUpdates.push(copy(patch)); desktopUpdateFlags.push(nativeSaves.at(-1)?.settings.onboardingCompleted); return { settings: {}, runtime: {} }; } } } : {})
   });
   const sandbox = vm.createContext({
     window, document: dom, FriendSeatConfig: friend, URL, Date, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, AbortController,
@@ -341,6 +345,7 @@ export function harness(options: { native?: 'committed' | 'pending-recovery'; na
   async function restore() { await stageRestore(); assert.equal(element('confirmDialog').open, true, 'the real file-change handler requests confirmation'); await click('confirmActionBtn'); }
   return {
     previous, next, trace, vault, dom, clock, storage, native, adapter, vision, speech, loadFallbacks, nativeSaves, store, closed, downloads, actions, element, click, submit, importDocument, stageRestore, stagePartial, restore,
+    desktopUpdates, desktopUpdateFlags,
     get snapshot() { return store.snapshot.value; }, get friend() { return friendOptions; }, get renderStyle() { return renderStyleOptions; },
     overrideLoad(value: LoadOverride | null) { loadOverride = value; }
   };
@@ -615,4 +620,143 @@ test('real draw sequence performs no work while recovery blocks availability', a
   window.SpeechProviders = { stop() { stopped++; } }; window.FriendSeatConfig = { hide() {} }; window.matchMedia = () => ({ matches: true });
   await sequence.startDraw().catch(() => {});
   assert.equal(stopped, 1); assert.ok(domAccess.length > 0, 'availability alone lets the real sequence proceed to DOM work');
+});
+
+function freshNative(initial: ClassState = engine.createEmptyState(1)) {
+  return new NativeData(initial, copy(oldCredentials), [], 'committed');
+}
+
+test('a brand-new portable state boots straight into the first-run flow', () => {
+  const empty = engine.createEmptyState(1);
+  const h = harness({ initial: empty, nativeData: freshNative(empty) });
+  assert.equal(h.snapshot.booted, true);
+  assert.equal(h.snapshot.onboarding, true);
+  assert.equal(h.snapshot.state.settings.onboardingCompleted, false);
+});
+
+test('an already configured profile never enters the first-run flow', () => {
+  const h = harness();
+  assert.equal(h.snapshot.booted, true);
+  assert.equal(h.snapshot.onboarding, false);
+});
+
+test('a legacy save without the flag counts as configured', () => {
+  const legacy = configured();
+  delete (legacy.settings as Partial<ClassState['settings']>).onboardingCompleted;
+  const h = harness({ initial: legacy, nativeData: freshNative(engine.clone(legacy)) });
+  assert.equal(h.snapshot.onboarding, false);
+});
+
+test('skipping the first run persists the completion flag and closes the flow', () => {
+  const empty = engine.createEmptyState(1);
+  const h = harness({ initial: empty, nativeData: freshNative(empty) });
+  assert.equal(h.actions.skipOnboarding(), true);
+  assert.equal(h.snapshot.onboarding, false);
+  assert.equal(h.nativeSaves.at(-1)!.settings.onboardingCompleted, true);
+  assert.deepEqual(h.desktopUpdates, []);
+});
+
+test('finishing applies the desktop draft only after the completion flag is durable', async () => {
+  const empty = engine.createEmptyState(1);
+  const h = harness({ initial: empty, nativeData: freshNative(empty) });
+  await h.actions.finishOnboarding({ uac: true, uiAccess: true });
+  assert.deepEqual(h.desktopUpdates, [{ uac: true, uiAccess: true }]);
+  // The bridge call must happen with the flag already written: a UAC relaunch may
+  // follow inside updateSettings, and the restarted process has to see it.
+  assert.deepEqual(h.desktopUpdateFlags, [true]);
+  assert.equal(h.nativeSaves.at(-1)!.settings.onboardingCompleted, true);
+  assert.equal(h.snapshot.onboarding, false);
+});
+
+test('a failed save keeps the first-run flow open with its error', async () => {
+  const h = harness({ initial: engine.createEmptyState(1) });
+  h.storage.failClassWrites = 1;
+  assert.equal(await h.actions.finishOnboarding({ uac: true }), false);
+  assert.equal(h.snapshot.onboarding, true);
+  assert.ok(h.snapshot.saveError);
+  assert.equal(h.snapshot.state.settings.onboardingCompleted, false);
+  // Without the flag there is no relaunch, so the desktop draft is never submitted.
+  assert.deepEqual(h.desktopUpdates, []);
+});
+
+test('rerunning the flow stores the unfinished flag and dismissals stay session-only', async () => {
+  const h = harness();
+  assert.equal(await h.actions.restartOnboarding(), true);
+  assert.equal(h.snapshot.onboarding, true);
+  assert.equal(h.storage.classWrites.at(-1)!.settings.onboardingCompleted, false);
+  assert.ok(h.closed.includes('configDialog'));
+
+  h.actions.dismissOnboardingForSession();
+  assert.equal(h.snapshot.onboarding, false);
+  assert.equal(h.storage.classWrites.length, 1);
+});
+
+test('restoring any backup ends the first run instead of asking again', async () => {
+  const h = harness({ initial: engine.createEmptyState(1) });
+  assert.equal(h.snapshot.onboarding, true);
+  // A backup captured mid-first-run carries the unfinished flag.
+  h.next.settings.onboardingCompleted = false;
+  await h.restore();
+  assert.equal(h.snapshot.onboarding, false);
+  assert.equal(h.storage.classWrites.at(-1)!.settings.onboardingCompleted, true);
+  assert.equal(h.snapshot.state.settings.onboardingCompleted, true);
+});
+
+test('the welcome page can restore a backup and open the roster importer', async () => {
+  const h = harness({ initial: engine.createEmptyState(1) });
+  h.actions.openRosterImport();
+  assert.equal(h.element('importDialog').open, true);
+
+  const bytes = new TextEncoder().encode(JSON.stringify({
+    format: 'SlateRandomBackup', version: 1, kind: 'all', state: h.next, credentials: nextCredentials, desktop: null
+  }));
+  await h.actions.restoreAllFile({ size: bytes.byteLength, arrayBuffer: async () => bytes.buffer } as unknown as File);
+  assert.equal(h.element('confirmDialog').open, true);
+  assert.match(h.element('confirmText').textContent, /恢复全部数据|将恢复/);
+});
+
+test('the first-run roster step restores a roster backup without ending the flow', async () => {
+  const h = harness({ initial: engine.createEmptyState(1) });
+  assert.equal(h.snapshot.onboarding, true);
+  const backup = {
+    format: 'SlateRandom.backup', version: 1, kind: 'roster', createdAt: '2026-10-18T00:00:00Z',
+    roster: {
+      className: '备份班级', demo: false, cols: 3, seatRows: 4,
+      students: [
+        { id: '3', name: '丙', row: 1, col: 2, active: true, friendTargets: ['1'] },
+        { id: '1', name: '甲', row: 1, col: 1, active: false },
+        { id: '7', name: '丁', row: 3, col: 2, active: true }
+      ]
+    }
+  };
+  const bytes = new TextEncoder().encode(JSON.stringify(backup));
+  await h.actions.restoreRosterFile({ size: bytes.byteLength, arrayBuffer: async () => bytes.buffer } as unknown as File);
+  // Replacing a roster always asks first, exactly like the data page.
+  assert.equal(h.element('confirmDialog').open, true);
+  assert.equal(h.element('confirmTitle').textContent, '导入名单');
+  await h.click('confirmActionBtn');
+
+  const stored = h.storage.classWrites.at(-1)!;
+  assert.equal(stored.className, '备份班级');
+  assert.equal(stored.cols, 3);
+  assert.equal(stored.seatRows, 4);
+  assert.deepEqual(stored.students.map(student => [student.id, student.row, student.col, student.active]),
+    [['3', 1, 2, true], ['1', 1, 1, false], ['7', 3, 2, true]]);
+  assert.deepEqual(stored.students.find(student => student.id === '3')?.friendTargets, ['1']);
+  // The roster is not a configuration: the first-run flow stays open and unfinished.
+  assert.equal(stored.settings.onboardingCompleted, false);
+  assert.equal(h.snapshot.onboarding, true);
+  assert.equal(h.snapshot.state.students.length, 3);
+  assert.match(h.element('backupDataStatus').textContent, /名单已导入/);
+});
+
+test('the tray settings command stays out of the way while the first-run flow owns the window', async () => {
+  const h = harness({ initial: engine.createEmptyState(1) });
+  assert.equal(h.snapshot.onboarding, true);
+  await h.dom.emit(h.element('drawBtn'), 'slate:open-settings');
+  assert.equal(h.element('configDialog').open, false);
+
+  h.actions.dismissOnboardingForSession();
+  await h.dom.emit(h.element('drawBtn'), 'slate:open-settings');
+  assert.equal(h.element('configDialog').open, true);
 });
