@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import ModeSettings from './ModeSettings.vue';
+import StrategyPicker from './StrategyPicker.vue';
 import { engine } from '../domain/engine';
 import type { ClassState, Mode, RecordMode } from '../../shared/domain/model';
 
@@ -47,15 +48,6 @@ const lockDirection = computed(() => {
   const direction = props.state.settings.direction;
   return direction === 'auto' ? '每轮重新随机方向' : '向' + engine.DIRECTIONS[direction][2];
 });
-
-function chooseStrategy(strategy: 'auto' | 'manual'): void {
-  if (!blocked.value) emit('strategy', strategy);
-}
-
-function chooseManualMode(event: Event): void {
-  const value = (event.target as HTMLSelectElement).value;
-  if (!blocked.value && (value === 'normal' || value === 'direction' || value === 'time')) emit('manualMode', value);
-}
 </script>
 
 <template>
@@ -70,37 +62,14 @@ function chooseManualMode(event: Event): void {
       </button>
     </div>
 
-    <div class="segmented" role="group" aria-label="策略选择">
-      <button
-        data-strategy="auto"
-        :class="{ selected: state.settings.strategy === 'auto' }"
-        :aria-pressed="state.settings.strategy === 'auto'"
-        :disabled="blocked"
-        @click="chooseStrategy('auto')"
-      >
-        <span class="icon material-icon" aria-hidden="true">shuffle</span>随机混合
-      </button>
-      <button
-        data-strategy="manual"
-        :class="{ selected: state.settings.strategy === 'manual' }"
-        :aria-pressed="state.settings.strategy === 'manual'"
-        :disabled="blocked"
-        @click="chooseStrategy('manual')"
-      >
-        <span class="icon material-icon" aria-hidden="true">tune</span>指定模式
-      </button>
-    </div>
-
-    <label id="manualModeField" :hidden="state.settings.strategy !== 'manual'">
-      指定抽选方式
-      <select id="manualModeInput" :value="state.settings.manualMode" :disabled="blocked" @change="chooseManualMode">
-        <option value="normal">普通随机</option>
-        <option value="direction">方向接力</option>
-        <option value="time">时间学号</option>
-      </select>
-    </label>
-
-    <p id="strategyHint" class="strategy-hint">{{ strategyHint }}</p>
+    <StrategyPicker
+      :strategy="state.settings.strategy"
+      :manual-mode="state.settings.manualMode"
+      :disabled="blocked"
+      :hint="strategyHint"
+      @strategy="value => emit('strategy', value)"
+      @manual-mode="value => emit('manualMode', value)"
+    />
     <ModeSettings
       :state="state"
       :busy="blocked"

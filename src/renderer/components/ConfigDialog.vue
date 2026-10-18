@@ -51,7 +51,8 @@ const pages: { id: ConfigView; name: string; icon: string }[] = [
       <DataPage :hidden="view !== 'data'" :state="snapshot.state" :busy="snapshot.busy"
         :save-error="snapshot.saveError" :recovery-required="snapshot.recoveryRequired" />
       <HelpPage :hidden="view !== 'help'" />
-      <AboutPage :hidden="view !== 'about'" />
+      <AboutPage :hidden="view !== 'about'" :actions="actions" :busy="snapshot.busy"
+        :recovery-required="snapshot.recoveryRequired" />
     </div>
     <footer class="config-footer"><span id="saveStatus" role="status">更改自动保存</span><span>短按抽人 · 长按 500 ms 设置</span></footer>
   </dialog>

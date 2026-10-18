@@ -17,6 +17,7 @@ import './styles/mode-settings.css';
 import './styles/lifetime-stats.css';
 import './styles/appearance.css';
 import './styles/theme.css';
+import './styles/onboarding.css';
 import { APPEARANCE_DEFAULT, applyAppearance, readAppearanceMirror } from './application/appearance';
 
 // Read-only diagnostic compatibility for deterministic browser regression fixtures.

@@ -19,6 +19,9 @@
 .mode-setting-row:focus-visible{outline:2px solid var(--color-settings-text);outline-offset:-2px}
 .mode-setting-row[aria-disabled="true"]{cursor:default}
 .mode-setting-row.has-no-details{cursor:default}
+/* A list without detail buttons drops the trailing column, so its switches line up
+   with the right edge (used by the first-run flow). */
+.mode-settings.has-compact-rows .mode-setting-row{grid-template-columns:minmax(84px,1fr) 62px 52px}
 .mode-setting-row[aria-disabled="true"] .mode-setting-heading{opacity:.48}
 .mode-setting-details:disabled{cursor:default;opacity:.4}
 @media(hover:hover){
@@ -28,6 +31,7 @@
 }
 @media(max-width:420px){
   .mode-setting-row{grid-template-columns:minmax(72px,1fr) 54px 44px 44px;gap:6px;min-height:64px}
+  .mode-settings.has-compact-rows .mode-setting-row{grid-template-columns:minmax(72px,1fr) 54px 44px}
   .mode-setting-heading{gap:6px}
   .mode-setting-heading>.icon{flex-basis:20px;width:20px;height:20px;font-size:20px}
   .mode-setting-name{font-size:12px}

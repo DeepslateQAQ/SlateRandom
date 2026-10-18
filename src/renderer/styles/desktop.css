@@ -103,7 +103,7 @@ html[data-desktop-role="ball"],html[data-desktop-role="ball"] body {
 .elevation-mode-picker:has(>label:nth-child(2)>input:checked)::before {transform:translateX(100%)}
 .elevation-mode-picker:has(>label:nth-child(3)>input:checked)::before {transform:translateX(200%)}
 .elevation-mode-picker>.elevation-mode-option {position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;margin:0;padding:0 10px;color:var(--tone-666);font-size:12px;line-height:1.25;white-space:nowrap;cursor:pointer;user-select:none;transition:color 180ms var(--ease-move)}
-.desktop-settings .elevation-mode-picker>.elevation-mode-option>input[type="radio"] {position:absolute;width:1px;height:1px;min-width:0;min-height:0;margin:0;padding:0;border:0;opacity:0;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden}
+.elevation-mode-picker>.elevation-mode-option>input[type="radio"] {position:absolute;width:1px;height:1px;min-width:0;min-height:0;margin:0;padding:0;border:0;opacity:0;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden}
 .elevation-mode-picker>.elevation-mode-option:has(input:checked) {color:var(--color-paper)}
 .elevation-mode-picker>.elevation-mode-option:has(input:focus-visible) {outline:2px solid currentColor;outline-offset:-3px}
 .elevation-mode-picker>.elevation-mode-option:not(:has(input:checked)):hover {color:var(--color-settings-text)}

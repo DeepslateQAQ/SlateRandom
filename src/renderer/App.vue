@@ -11,6 +11,7 @@ import { BrowserClassRepository, BrowserFilePort, BrowserFullscreenPort } from '
 import { DesktopClassRepository, DesktopFilePort } from './platform/desktop';
 import { APPEARANCE_MIRROR_KEY, applyAppearance, readAppearanceMirror } from './application/appearance';
 import FloatingBall from './components/FloatingBall.vue';
+import OnboardingFlow from './components/OnboardingFlow.vue';
 import './styles/desktop.css';
 
 const desktopRole = window.slateDesktop?.role;
@@ -21,13 +22,19 @@ document.title = desktopRole ? 'SlateRandom 岩选 · 更好玩好用的随机�
 const store = createAppStore(engine.createEmptyState());
 const snapshot = store.snapshot;
 const actions = shallowRef<ApplicationActions>();
+const portable = Boolean(window.slateDesktop?.data && !window.slateDesktop.data.preview);
 onMounted(() => {
   if (desktopRole === 'ball') return;
   const data = window.slateDesktop?.data;
-  const portable = data && !data.preview;
-  actions.value = mountController({ store, repository: portable ? new DesktopClassRepository(data) : new BrowserClassRepository(),
-    filePort: portable ? new DesktopFilePort(data) : new BrowserFilePort(), fullscreenPort: new BrowserFullscreenPort() });
+  actions.value = mountController({ store, repository: portable && data ? new DesktopClassRepository(data) : new BrowserClassRepository(),
+    filePort: portable && data ? new DesktopFilePort(data) : new BrowserFilePort(), fullscreenPort: new BrowserFullscreenPort() });
 });
+
+if (portable) {
+  // A migrated profile can still turn out to be a first run; the main window
+  // was only kept hidden by the ball preference, so ask for it explicitly.
+  watch(() => snapshot.value.onboarding, open => { if (open) void window.slateDesktop?.openMain().catch(() => {}); });
+}
 
 if (desktopRole !== 'ball') {
   // Not immediate: the first paint uses the mirror/system default in main.ts,
@@ -84,5 +91,8 @@ if (desktopRole === 'ball') {
     <ConfigDialog :snapshot="snapshot" :actions="actions" />
     <ModalDialogs v-once />
     <StatusLayer v-once />
+    <OnboardingFlow :snapshot="snapshot" :actions="actions" />
+    <div v-if="snapshot.onboarding" class="onboarding-cover" aria-hidden="true"></div>
+    <div v-if="!snapshot.booted" class="boot-veil" aria-hidden="true"></div>
   </template>
 </template>

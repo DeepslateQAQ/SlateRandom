@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import secrandomLogo from '../../../resources/friends/secrandom.png?inline';
 import iccLogo from '../../../resources/friends/icc.png?inline';
+import type { ApplicationActions } from '../application/controller.js';
+
+withDefaults(defineProps<{
+  actions?: ApplicationActions;
+  busy?: boolean;
+  recoveryRequired?: boolean;
+}>(), { actions: undefined, busy: false, recoveryRequired: false });
 
 const desktop = Boolean(window.slateDesktop);
 </script>
@@ -35,6 +42,9 @@ const desktop = Boolean(window.slateDesktop);
         <symbol id="aboutGlobeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></symbol>
       </svg>
     </article>
+    <article class="settings-info-section"><h3>首次引导</h3><p>重新查看外观、名单和概率设置。</p>
+      <button id="rerunOnboardingBtn" class="btn btn-plain onboarding-rerun" :disabled="busy || recoveryRequired || !actions"
+        @click="actions?.restartOnboarding()">重新运行首次引导</button></article>
     <article class="settings-info-section"><h3>关于随机与公平</h3><p>使用有状态伪随机数与动态权重，结合未抽优先、近期冷却和跨会话统计，让机会逐渐趋于平均。座位、学号与模式规则会影响单次抽取的候选范围。</p></article>
     <article class="settings-info-section"><h3>开源与致谢</h3><p>Copyright © 2026 DeepslateQAQ。项目原创代码以 GNU GPL 第 3 版或更新版本许可发布，可按许可条款修改与再分发，不提供担保。发行目录包含完整 LICENSE；Lite 单文件内嵌 projectLicense 许可文本块。图标使用 Google Material Symbols，表格导入使用 SheetJS；第三方组件保留各自许可与版权声明，相应说明随程序一同提供。</p></article>
   </section>

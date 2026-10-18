@@ -20,7 +20,11 @@ const props = withDefaults(defineProps<{
   state: ClassState;
   busy: boolean;
   validationRevision?: number;
-}>(), { validationRevision: 0 });
+  /** Prefixes every DOM id so the flow can host a second, isolated copy. */
+  idPrefix?: string;
+  /** The first-run flow shows probabilities and switches without detail links. */
+  showDetails?: boolean;
+}>(), { validationRevision: 0, idPrefix: '', showDetails: true });
 
 const emit = defineEmits<{
   toggle: [mode: EditableMode, enabled: boolean];
@@ -67,17 +71,21 @@ watch(() => props.validationRevision, clearDrafts, { flush: 'sync' });
 watch(() => props.busy, value => { if (value) clearDrafts(); });
 
 function title(mode: ModeDefinition): string {
-  if (mode.id === 'normal') return '普通抽选使用剩余概率；点击调整冷却与公平设置';
-  if (mode.id === 'friend') return '下一次先独立尝试友尽概率，不计入混合概率合计；点击查看友尽设置';
+  if (mode.id === 'normal') return props.showDetails ? '普通抽选使用剩余概率；点击调整冷却与公平设置' : '普通抽选使用剩余概率';
+  if (mode.id === 'friend') return props.showDetails ? '下一次先独立尝试友尽概率，不计入混合概率合计；点击查看友尽设置' : '友尽模式，概率与开关';
   if (mode.id === 'endJump') return '揭晓前独立尝试继续随机或回选前一个焦点；不计入混合概率合计，仍遵守公平保护';
+  if (!props.showDetails) return mode.name + '，概率与开关';
   if (mode.id === 'direction' && props.state.directionCooldownRemaining > 0) {
     return '连坐冷却中，剩余 ' + props.state.directionCooldownRemaining + ' 轮；点击调整连坐设置';
   }
   return '点击查看' + mode.name + '的附加设置';
 }
 
+const detailEnabled = (mode: ControlId): mode is RecordMode => props.showDetails && mode !== 'endJump';
+const idFor = (value: string): string => props.idPrefix + value;
+
 function openDetails(mode: ControlId): void {
-  if (!props.busy && mode !== 'endJump') emit('details', mode);
+  if (!props.busy && detailEnabled(mode)) emit('details', mode);
 }
 
 function rowClick(mode: ControlId, event: MouseEvent): void {
@@ -120,18 +128,18 @@ function finishEdit(mode: ControlId): void {
 </script>
 
 <template>
-  <div id="modeOptions" class="mode-settings" aria-label="抽选模式、触发概率与开关" :aria-busy="busy">
+  <div :id="idFor('modeOptions')" class="mode-settings" :class="{ 'has-compact-rows': !showDetails }" aria-label="抽选模式、触发概率与开关" :aria-busy="busy">
     <div
       v-for="mode in modes"
       :key="mode.id"
       class="mode-setting-row"
-      :class="{ selected: enabled(mode.id), 'has-no-details': mode.id === 'endJump', 'is-manual-selected': state.settings.strategy === 'manual' && state.settings.manualMode === mode.id }"
+      :class="{ selected: enabled(mode.id), 'has-no-details': !detailEnabled(mode.id), 'is-manual-selected': state.settings.strategy === 'manual' && state.settings.manualMode === mode.id }"
       :data-mode-row="mode.id"
       :data-enabled="enabled(mode.id)"
       role="group"
-      :aria-label="mode.name + (mode.id === 'endJump' ? '，独立末尾概率与开关' : '，概率与开关，点击查看附加设置')"
+      :aria-label="mode.name + (mode.id === 'endJump' ? '，独立末尾概率与开关' : showDetails ? '，概率与开关，点击查看附加设置' : '，概率与开关')"
       :aria-disabled="busy"
-      :tabindex="busy || mode.id === 'endJump' ? -1 : 0"
+      :tabindex="busy || !detailEnabled(mode.id) ? -1 : 0"
       :title="title(mode)"
       @click="rowClick(mode.id, $event)"
       @keydown="rowKeyDown(mode.id, $event)"
@@ -143,7 +151,7 @@ function finishEdit(mode: ControlId): void {
 
       <label class="mode-setting-probability" data-mode-control="chance" @click.stop @keydown.stop>
         <input
-          :id="mode.chanceId"
+          :id="idFor(mode.chanceId)"
           :data-mode-chance="mode.id"
           :data-editing="mode.id !== 'normal' && editingMode === mode.id ? 'true' : undefined"
           type="number"
@@ -166,13 +174,13 @@ function finishEdit(mode: ControlId): void {
 
       <label class="mode-setting-switch" data-mode-control="toggle" @click.stop @keydown.stop>
         <input
-          :id="mode.toggleId"
+          :id="idFor(mode.toggleId)"
           :data-mode-enabled="mode.id"
           type="checkbox"
           class="rect-switch"
           role="switch"
           :aria-label="'启用' + mode.name"
-          :aria-controls="mode.chanceId"
+          :aria-controls="idFor(mode.chanceId)"
           :checked="enabled(mode.id)"
           :disabled="busy || mode.id === 'normal'"
           @change.stop="toggleMode(mode.id, $event)"
@@ -180,8 +188,8 @@ function finishEdit(mode: ControlId): void {
       </label>
 
       <button
-        v-if="mode.id !== 'endJump'"
-        :id="'modeDetails-' + mode.id"
+        v-if="detailEnabled(mode.id)"
+        :id="idFor('modeDetails-' + mode.id)"
         type="button"
         class="mode-setting-details"
         data-mode-control="details"

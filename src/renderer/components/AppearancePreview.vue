@@ -6,14 +6,17 @@ import { themeLabel } from '../application/appearance';
 const props = defineProps<{
   settings: Pick<Settings, 'theme' | 'accent' | 'radius'>;
   systemDark: boolean;
+  /** Callers that render a second preview (the first-run flow) pass their own id. */
+  id?: string;
 }>();
+const previewId = computed(() => props.id || 'appearancePreview');
 
 const caption = computed(() => '外观预览：' + themeLabel(props.settings.theme, props.systemDark)
   + ' · ' + props.settings.accent + ' · 圆角 ' + props.settings.radius + ' px');
 </script>
 
 <template>
-  <figure id="appearancePreview" class="appearance-preview">
+  <figure :id="previewId" class="appearance-preview">
     <div class="appearance-preview-grid" aria-hidden="true">
       <div class="appearance-preview-cell">
         <div class="appearance-preview-panel appearance-preview-stage">
