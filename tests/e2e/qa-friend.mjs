@@ -61,7 +61,7 @@ async function openRoster() { await openConfig(); await selectClick('[data-nav="
 async function picture(name) { const r = await client.send('Page.captureScreenshot', { format: 'png' }); await writeFile(path.join(output, name), Buffer.from(r.data, 'base64')); screenshots.push(name); }
 async function state() { return client.evaluate(key => JSON.parse(localStorage.getItem(key)), KEY); }
 async function reload(s) {
-  if (s) { s.demo = false; s.settings.theme = 'classic'; s.settings.radius = 0; }
+  if (s) { s.demo = false; s.settings.theme = 'classic'; s.settings.radius = 0; s.settings.onboardingCompleted = true; }
   await client.evaluate((key, s) => { if (s) localStorage.setItem(key, JSON.stringify(s)); window.__friendOldPage = true; }, KEY, s);
   await client.send('Page.reload');
   await waitFor(() => client.evaluate(() => !window.__friendOldPage && document.querySelectorAll('[data-mode-row]').length === 5));

@@ -91,6 +91,11 @@ async function launch(release, legacyDirectory, label) {
 }
 async function closeRun(run) {
   if (run.exited) return;
+  // A first-run launch opens the main window, and the hold-to-quit path lives on
+  // the ball; hand the screen back to the ball before quitting.
+  await run.main.evaluate(() => slateDesktop.hideMain());
+  await wait(() => run.main.evaluate(() => slateDesktop.state().then(state => state.main.visible === false)), run.label + ' main window hidden');
+  await pause(250);
   await run.ball.evaluate(() => slateDesktop.beginConfirmation());
   void run.ball.evaluate(() => slateDesktop.quit()).catch(() => {});
   const code = await Promise.race([run.ended, pause(12000).then(() => 'timeout')]);

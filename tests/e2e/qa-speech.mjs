@@ -106,7 +106,7 @@ async function dbRecords() {
   }), DB);
 }
 async function reload(state) {
-  if (state) { state.demo = false; state.settings.theme = 'classic'; state.settings.radius = 0; }
+  if (state) { state.demo = false; state.settings.theme = 'classic'; state.settings.radius = 0; state.settings.onboardingCompleted = true; }
   await client.evaluate((key, state) => { if (state) localStorage.setItem(key, JSON.stringify(state)); window.__speechOldPage = true; }, KEY, state);
   await client.send('Page.reload');
   await waitFor(() => client.evaluate(() => !window.__speechOldPage && window.SpeechProviders && document.querySelectorAll('[data-mode-row]').length === 5));
@@ -202,7 +202,7 @@ try {
 
   await client.evaluate(() => {
     const state = DrawCore.createEmptyState(4242);
-    state.settings = DrawCore.settings({ ...state.settings, theme: 'classic', radius: 0 });
+    state.settings = DrawCore.settings({ ...state.settings, theme: 'classic', radius: 0, onboardingCompleted: true });
     localStorage.setItem('rollcall-studio:v1', JSON.stringify(state));
   });
   await reload();

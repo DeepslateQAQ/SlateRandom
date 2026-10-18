@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = path.join(root, 'qa-output');
-const scripts = ['tests/e2e/qa.mjs', 'tests/e2e/qa-extra.mjs', 'tests/e2e/qa-ui.mjs', 'tests/e2e/qa-friend.mjs', 'tests/e2e/qa-render-styles.mjs', 'tests/e2e/qa-speech.mjs', 'tests/e2e/qa-settings-layout.mjs', 'tests/e2e/qa-dev-smoke.mjs', 'tests/e2e/qa-import.mjs', 'tests/integration/qa-desktop.mjs', 'tests/integration/qa-packaged.mjs'];
+const scripts = ['tests/e2e/qa.mjs', 'tests/e2e/qa-extra.mjs', 'tests/e2e/qa-ui.mjs', 'tests/e2e/qa-friend.mjs', 'tests/e2e/qa-render-styles.mjs', 'tests/e2e/qa-speech.mjs', 'tests/e2e/qa-settings-layout.mjs', 'tests/e2e/qa-onboarding.mjs', 'tests/e2e/qa-dev-smoke.mjs', 'tests/e2e/qa-import.mjs', 'tests/integration/qa-desktop.mjs', 'tests/integration/qa-packaged.mjs'];
 const start = process.argv.includes('--from') ? scripts.slice(scripts.indexOf(process.argv[process.argv.indexOf('--from') + 1])) : scripts;
 const skipped = process.argv.includes('--skip') ? process.argv[process.argv.indexOf('--skip') + 1]?.split(',') ?? [] : [];
 if (skipped.some(script => !scripts.includes(script))) throw Error('Unknown QA skip script.');

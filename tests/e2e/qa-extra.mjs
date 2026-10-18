@@ -22,7 +22,7 @@ function check(label, value) { assert.ok(value, label); checks.push(label); cons
 async function click(id) { await client.evaluate(async id => { const e = document.getElementById(id); const view = e.closest('section.view[hidden]'); if (view) { document.querySelector('.navigation [data-nav="' + view.id.replace('view-', '') + '"]').click(); await new Promise(resolve => setTimeout(resolve, 0)); } e.click(); await new Promise(resolve => setTimeout(resolve, 0)); }, id); await waitFor(() => client.evaluate(() => !document.querySelector('dialog[data-motion]')), 2000); }
 async function picture(name) { const data = await client.send('Page.captureScreenshot', { format: 'png' }); await writeFile(path.join(output, name), Buffer.from(data.data, 'base64')); screenshots.push(name); }
 async function finished() { await waitFor(() => client.evaluate(() => document.getElementById('drawBtn').getAttribute('aria-busy') === 'false'), 12000); }
-async function reload(state) { state.demo = false; state.settings.theme = 'classic'; state.settings.radius = 0; await client.evaluate((key, state) => { localStorage.setItem(key, JSON.stringify(state)); window.__oldPage = true; }, KEY, state); await client.send('Page.reload'); await waitFor(() => client.evaluate(() => !window.__oldPage && document.querySelectorAll('[data-mode-row]').length === 5)); }
+async function reload(state) { state.demo = false; state.settings.theme = 'classic'; state.settings.radius = 0; state.settings.onboardingCompleted = true; await client.evaluate((key, state) => { localStorage.setItem(key, JSON.stringify(state)); window.__oldPage = true; }, KEY, state); await client.send('Page.reload'); await waitFor(() => client.evaluate(() => !window.__oldPage && document.querySelectorAll('[data-mode-row]').length === 5)); }
 try {
   browser = spawn('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', ['--headless=new', '--disable-gpu', '--blink-settings=primaryHoverType=2,availableHoverTypes=2', '--no-first-run', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--no-proxy-server', '--remote-debugging-port=0', '--window-size=1000,800', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
   let port; await waitFor(async () => { port = Number((await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]); return port > 0; }, 20000);
@@ -33,7 +33,7 @@ try {
   await waitFor(() => client.evaluate(() => document.querySelectorAll('[data-mode-row]').length === 5));
   await client.evaluate(() => {
     const state = DrawCore.createEmptyState(4242);
-    state.settings = DrawCore.settings({ ...state.settings, theme: 'classic', radius: 0 });
+    state.settings = DrawCore.settings({ ...state.settings, theme: 'classic', radius: 0, onboardingCompleted: true });
     localStorage.setItem('rollcall-studio:v1', JSON.stringify(state));
   });
   await client.send('Page.reload');

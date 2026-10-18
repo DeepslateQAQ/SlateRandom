@@ -61,7 +61,7 @@ async function openConfig() {
 }
 async function state() { return client.evaluate(key => JSON.parse(localStorage.getItem(key)), KEY); }
 async function reload(s) {
-  if (s) { s.demo = false; s.settings.theme = 'classic'; s.settings.radius = 0; }
+  if (s) { s.demo = false; s.settings.theme = 'classic'; s.settings.radius = 0; s.settings.onboardingCompleted = true; }
   await client.evaluate((key, s) => { if (s) localStorage.setItem(key, JSON.stringify(s)); window.__renderOldPage = true; }, KEY, s);
   await client.send('Page.reload');
   await waitFor(() => client.evaluate(() => !window.__renderOldPage && document.getElementById('renderStylePicker') && document.querySelectorAll('[data-mode-row]').length === 5));

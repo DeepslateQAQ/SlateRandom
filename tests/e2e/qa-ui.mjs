@@ -138,7 +138,7 @@ function nonlinearHold(sample) {
   return held.duration === 500 && held.time >= 260 && held.time < 400 && Math.abs(held.fraction - held.time / held.duration) > .025 && held.easing.includes('cubic-bezier') && released.easing.includes('cubic-bezier') && held.easing !== released.easing && Math.abs(held.fraction - released.fraction) < .015 && Math.abs(released.duration - held.fraction * 500) <= 1 && samples.length >= 3 && samples.slice(1).every((value, index) => value <= samples[index] + .005) && samples.some(value => value > 0 && value < released.fraction - .005) && sample.clean && sample.unchanged && sample.noDraw && sample.noDialog;
 }
 async function reload(state) {
-  if (state) { state.demo = false; state.settings.theme = 'classic'; state.settings.radius = 0; }
+  if (state) { state.demo = false; state.settings.theme = 'classic'; state.settings.radius = 0; state.settings.onboardingCompleted = true; }
   await client.evaluate((key, state) => { if (state) localStorage.setItem(key, JSON.stringify(state)); window.__uiOldPage = true; }, KEY, state);
   await client.send('Page.reload');
   await waitFor(() => client.evaluate(() => !window.__uiOldPage && document.querySelectorAll('[data-mode-row]').length === 5));

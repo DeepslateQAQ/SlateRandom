@@ -44,7 +44,7 @@ async function openConfig() { const p = await buttonPoint(); await mouse('mouseP
 async function closeConfig() { await click('#closeConfigBtn'); await waitFor(() => cdp.evaluate(() => !document.getElementById('configDialog').open && document.getElementById('drawBtn').getAttribute('aria-expanded') === 'false')); }
 async function drawFinished() { await waitFor(() => cdp.evaluate(() => document.getElementById('drawBtn').getAttribute('aria-busy') === 'false' && !document.getElementById('drawBtn').hasAttribute('data-hold-releasing')), 10000); }
 async function waitForScene(mode) { await waitFor(() => cdp.evaluate(mode => !document.getElementById('liveSeatScroll').dataset.transition && document.querySelector('.draw-screen').matches('.is-animating[data-animation="' + mode + '"]') && (mode === 'time' ? !document.getElementById('timeVisual').hidden : mode === 'normal' ? !!document.querySelector('#liveSeats .candidate') : document.getElementById('seatArrow').classList.contains('spinning-arrow')), mode), 4500); }
-async function reloadStoredState(state, endJumpChance = 0) { if (typeof state !== 'string') { state.demo = false; state.settings.endJumpChance = endJumpChance; state.settings.theme = 'classic'; state.settings.radius = 0; } await cdp.evaluate((key, state) => { localStorage.setItem(key, typeof state === 'string' ? state : JSON.stringify(state)); window.__qaBeforeReload = true; }, KEY, state); await cdp.send('Page.reload'); await waitFor(() => cdp.evaluate(() => !window.__qaBeforeReload && document.getElementById('rosterSeats')?.children.length > 0)); await installLifecycleProbes(); }
+async function reloadStoredState(state, endJumpChance = 0) { if (typeof state !== 'string') { state.demo = false; state.settings.endJumpChance = endJumpChance; state.settings.theme = 'classic'; state.settings.radius = 0; /* Fixtures replay configured profiles, so the first-run flow stays out. */ state.settings.onboardingCompleted = true; } await cdp.evaluate((key, state) => { localStorage.setItem(key, typeof state === 'string' ? state : JSON.stringify(state)); window.__qaBeforeReload = true; }, KEY, state); await cdp.send('Page.reload'); await waitFor(() => cdp.evaluate(() => !window.__qaBeforeReload && document.getElementById('rosterSeats')?.children.length > 0)); await installLifecycleProbes(); }
 async function installLifecycleProbes() {
   await cdp.evaluate((source, key) => {
     if (window.__qaLifecycle) return;
@@ -265,7 +265,7 @@ try {
   // Old visual baselines expect the classic dark stage and square controls.
   await cdp.evaluate(key => {
     const state = window.DrawCore.createEmptyState(4242);
-    state.settings = window.DrawCore.settings({ ...state.settings, theme: 'classic', radius: 0 });
+    state.settings = window.DrawCore.settings({ ...state.settings, theme: 'classic', radius: 0, onboardingCompleted: true });
     localStorage.setItem(key, JSON.stringify(state));
     window.__qaBeforeReload = true;
   }, KEY);

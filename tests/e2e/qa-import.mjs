@@ -105,6 +105,7 @@ async function reload(snapshot) {
   snapshot.demo = false;
   snapshot.settings.theme = 'classic';
   snapshot.settings.radius = 0;
+  snapshot.settings.onboardingCompleted = true;
   await client.evaluate((key, value) => { localStorage.setItem(key, JSON.stringify(value)); window.__importOldPage = true; }, KEY, snapshot);
   await client.send('Page.reload');
   await waitFor(() => client.evaluate(() => !window.__importOldPage && document.querySelectorAll('[data-mode-row]').length === 5));

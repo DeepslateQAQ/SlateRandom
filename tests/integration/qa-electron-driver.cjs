@@ -199,16 +199,49 @@ async function scenePerformance(main,ball){
     await fs.writeFile(path.join(output,'scene-performance-partial-report.json'),JSON.stringify(report,null,2));throw error;
   }finally{if(attached&&main.webContents.debugger.isAttached())main.webContents.debugger.detach();}
 }
+/** The first launch of a fresh profile must land in the flow, then hand the app
+ *  back to the classic floating-ball checks below. */
+async function firstRunFlow(main,ball){
+  await wait(()=>main.isVisible());
+  check('首次启动直接显示主窗口并隐藏悬浮球',main.isVisible()&&!ball.isVisible());
+  check('首次启动打开全窗口引导并停在欢迎页',await run(main,()=>{const dialog=document.getElementById('onboardingDialog');return dialog.open===true&&document.getElementById('onboardingTitle').textContent.includes('SlateRandom 岩选')&&!!document.getElementById('onboardingStartBtn')&&!!document.getElementById('onboardingImportBackupBtn')&&!!document.getElementById('onboardingBackupFile')&&!!document.getElementById('onboardingSkipBtn');}));
+  await shot(main,'desktop-onboarding-welcome.png');
+  await wait(()=>run(main,()=>document.getElementById('onboardingStartBtn')?.disabled===false),6000);
+  await run(main,()=>document.getElementById('onboardingStartBtn').click());
+  await wait(()=>run(main,()=>document.querySelector('[data-onboarding-step="appearance"]')));
+  check('引导第一步展示外观预览与明暗主题切换',await run(main,()=>!!document.getElementById('onboardingAppearancePreview')&&document.querySelectorAll('[data-onboarding-theme]').length===4&&!!document.getElementById('onboardingRadiusInput')));
+  await shot(main,'desktop-onboarding-appearance.png');
+  await run(main,()=>document.getElementById('onboardingNextBtn').click());
+  await wait(()=>run(main,()=>document.querySelector('[data-onboarding-step="general"]')));
+  check('桌面步骤展示开机自启、提权方式与 UIAccess，默认未启用 UIAccess',await run(main,()=>!!document.getElementById('onboardingAutostartInput')&&!!document.getElementById('onboardingElevationMethod')&&document.getElementById('onboardingUiAccessInput').disabled===true));
+  const elevationBefore=controller.state().settings.manualElevation;
+  await run(main,()=>document.querySelector('#onboardingElevationMethod input[value=compatibility]').click());
+  await pause(150);
+  check('提权方式只写入引导草稿，完成前不改动已保存设置',controller.state().settings.manualElevation===elevationBefore&&await run(main,()=>document.querySelector('#onboardingElevationMethod input[value=compatibility]').checked===true));
+  await shot(main,'desktop-onboarding-desktop.png');
+  await run(main,()=>document.getElementById('onboardingBackBtn').click());
+  await wait(()=>run(main,()=>document.querySelector('[data-onboarding-step="appearance"]')));
+  await run(main,()=>document.getElementById('onboardingBackBtn').click());
+  await wait(()=>run(main,()=>document.querySelector('[data-onboarding-step="welcome"]')));
+  await wait(()=>run(main,()=>document.getElementById('onboardingSkipBtn')?.disabled===false));
+  await run(main,()=>document.getElementById('onboardingSkipBtn').click());
+  await wait(()=>run(main,()=>document.getElementById('onboardingDialog').open===false));
+  check('跳过引导后关闭全窗口引导并保留主界面',await run(main,()=>document.getElementById('onboardingDialog').open===false&&!!document.getElementById('drawBtn')&&slateDesktop.data.loadClass()?.settings?.onboardingCompleted===true));
+  // A never-shown native window can freeze its CSS transition timeline. The
+  // ball takes over here, shown without focus, so the rendered confirmation is real.
+  await run(main,()=>slateDesktop.hideMain());
+  await wait(()=>ball.isVisible()&&!main.isVisible());
+  ball.showInactive();
+  check('跳过引导后主界面收起并恢复可交互的悬浮球',ball.isVisible()&&!main.isVisible());
+}
 app.whenReady().then(async()=>{
   try{
     await wait(()=>controller.isReady());const {main,ball}=controller.getWindows();
-    // A never-shown native window can freeze its CSS transition timeline.
-    // Show without taking focus so this verifies the rendered confirmation.
-    ball.showInactive();
     for(const win of [main,ball]){win.webContents.on('console-message',details=>{if(details.level==='error')errors.push(details.message);});win.webContents.on('preload-error',(_event,_file,error)=>errors.push(error.message));}
     await wait(()=>run(ball,()=>document.querySelector('#floatingBallButton') && window.slateDesktop?.role==='ball'));
     await wait(()=>run(main,()=>document.querySelector('#drawBtn') && document.querySelectorAll('[data-mode-row]').length===5));
     await run(ball,()=>document.fonts.ready);await run(main,()=>document.fonts.ready);
+    await firstRunFlow(main,ball);
     if(process.argv.includes('--slate-performance')){await scenePerformance(main,ball);app.exit(0);return;}
     check('Electron 真实创建两个隔离窗口，悬浮球与主程序分别挂载',await run(ball,()=>!document.getElementById('drawBtn')&&!!document.getElementById('floatingBall'))&&await run(main,()=>!document.getElementById('floatingBall')&&!!document.getElementById('drawBtn')));
     check('主窗口无边框、不可缩放并处于置顶，悬浮球也置顶',!main.isResizable()&&!main.isMaximizable()&&!main.isFullScreenable()&&main.isAlwaysOnTop()&&ball.isAlwaysOnTop());
@@ -309,7 +342,7 @@ app.whenReady().then(async()=>{
     await wait(async()=>controller.state().runtime.error?.includes('验证模式')&&await run(main,()=>!document.getElementById('desktopAutostartInput').disabled&&!document.getElementById('desktopAutostartInput').checked));
     check('自启保存被拒绝后恢复手动选项与全部原设置，不留下计划任务选项',Object.entries(beforeStartup).every(([key,value])=>controller.state().settings[key]===value)&&await run(main,()=>!document.getElementById('desktopAutostartInput').checked&&document.querySelector('#desktopElevationMethod input[value=compatibility]').checked&&!document.querySelector('#desktopElevationMethod input[value=task]')&&Array.from(document.querySelectorAll('#desktopElevationMethod input'),input=>input.value).join('|')==='disabled|uac|compatibility'));
     await shot(main,'desktop-general-settings.png');
-    await run(main,async()=>{await DialogTransitions.close(document.getElementById('configDialog'));const c=DrawCore.createEmptyState(477);c.settings.renderStyle='overview';slateDesktop.data.saveClass(DrawCore.restoreState(c));location.reload();});
+    await run(main,async()=>{await DialogTransitions.close(document.getElementById('configDialog'));const c=DrawCore.createEmptyState(477);c.settings.renderStyle='overview';c.settings.onboardingCompleted=true;slateDesktop.data.saveClass(DrawCore.restoreState(c));location.reload();});
     await wait(()=>run(main,()=>document.querySelector('.draw-screen')?.dataset.renderStyle==='overview'&&document.getElementById('liveBoardEmptyNotice')?.textContent.includes('名单不可用')));
     await wait(()=>run(main,()=>Number(getComputedStyle(document.getElementById('liveBoardEmptyNotice')).opacity)>.99),4000);
     check('全览在未配置时明确显示名单不可用，没有虚构座位',await run(main,()=>document.getElementById('liveBoardEmptyNotice').textContent.includes('名单不可用')&&document.querySelectorAll('.live-seat[data-live-student]').length===0&&document.getElementById('liveSeatMap').hidden&&!document.getElementById('liveSeatMap').style.transform.includes('Infinity')));

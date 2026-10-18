@@ -88,6 +88,13 @@ try{foreach($entry in $zip.Entries){$target=[IO.Path]::GetFullPath([IO.Path]::Co
   };
   await connect(main);
   await wait(() => evaluate(() => !!document.getElementById('drawBtn') && window.slateDesktop?.role === 'main'));
+  // A brand-new packaged profile opens the first-run flow; skipping it once leaves
+  // the empty roster the rest of this suite checks.
+  const firstRunOpened = await evaluate(() => document.getElementById('onboardingDialog')?.open === true);
+  await wait(() => evaluate(() => { const skip = document.getElementById('onboardingSkipBtn'); return !!skip && !skip.disabled; }), 'first-run flow ready');
+  await evaluate(() => document.getElementById('onboardingSkipBtn').click());
+  await wait(() => evaluate(() => document.getElementById('onboardingDialog').open === false));
+  check('实际发布包首次启动进入首次引导并可直接跳过', firstRunOpened && await evaluate(() => !document.getElementById('onboardingDialog').open && !!document.getElementById('drawBtn')));
   check('实际打包主页面启用隔离桥接且默认空名单', await evaluate(() => window.slateDesktop.role === 'main' && typeof window.require === 'undefined' && typeof window.process === 'undefined' && document.querySelectorAll('[data-live-student]').length === 0));
   check('实际发布主进程已加载桌面 TTS 服务并拒绝无效输入', await evaluate(() => slateDesktop.speech.synthesize('', '茉莉').then(() => false, error => String(error?.message || error).includes('姓名文本无效'))));
   const portableInfo=await evaluate(()=>slateDesktop.data.info());

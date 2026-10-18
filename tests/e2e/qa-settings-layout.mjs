@@ -52,6 +52,7 @@ async function close(id) { await client.evaluate(id => window.DialogTransitions.
 async function picture(name) { const result = await client.send('Page.captureScreenshot', { format: 'png' }); await writeFile(path.join(output, name), Buffer.from(result.data, 'base64')); screenshots.push(name); }
 async function state() { return client.evaluate(key => JSON.parse(localStorage.getItem(key)), KEY); }
 async function reload(value, { keepAppearance = false } = {}) {
+  if (value?.settings) value.settings.onboardingCompleted = true;
   if (value?.settings && !keepAppearance) { value.settings.theme = 'classic'; value.settings.radius = 0; }
   await client.evaluate((key, value) => { if (value) localStorage.setItem(key, JSON.stringify(value)); window.__settingsOldPage = true; }, KEY, value);
   await client.send('Page.reload');
