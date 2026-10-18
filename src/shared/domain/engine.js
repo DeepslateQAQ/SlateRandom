@@ -7,7 +7,7 @@
   const MODES = ['normal', 'direction', 'time'];
   const RECORD_MODES = MODES.concat('friend');
   const DIRECTIONS = { up: [-1, 0, '上'], right: [0, 1, '右'], down: [1, 0, '下'], left: [0, -1, '左'] };
-  const DEFAULTS = { strategy: 'auto', manualMode: 'normal', modes: MODES, cooldown: 3, strength: 1.6, direction: 'auto', directionRounds: 'random', directionMin: 3, directionMax: 5, directionCooldownMin: 3, directionCooldownMax: 5, directionChance: 33, timeChance: 33, friendEnabled: true, friendChance: 20, endJumpEnabled: true, endJumpChance: 30, timeSource: 'time', timeSelection: 'random', positions: '5,6', voice: false, theme: 'system', accent: '#65dc99', radius: 8, customCss: '', customCssEnabled: false, backgroundTint: false };
+  const DEFAULTS = { strategy: 'auto', manualMode: 'normal', modes: MODES, cooldown: 3, strength: 1.6, direction: 'auto', directionRounds: 'random', directionMin: 3, directionMax: 5, directionCooldownMin: 3, directionCooldownMax: 5, directionChance: 33, timeChance: 33, friendEnabled: true, friendChance: 20, endJumpEnabled: true, endJumpChance: 30, timeSource: 'time', timeSelection: 'random', positions: '5,6', voice: false, theme: 'system', accent: '#65dc99', radius: 8, customCss: '', customCssEnabled: false, backgroundTint: false, onboardingCompleted: true };
   const clone = value => JSON.parse(JSON.stringify(value));
   const integer = (value, min, max, label) => {
     const n = Number(value);
@@ -107,6 +107,9 @@
       ? s.customCss.replace(/\u0000/g, '').slice(0, 16384) : '';
     s.customCssEnabled = s.customCssEnabled === true;
     s.backgroundTint = s.backgroundTint === true;
+    // Older saves, legacy profiles and backups never stored this flag; they are
+    // already configured, so only an explicit false keeps the first-run flow alive.
+    s.onboardingCompleted = s.onboardingCompleted !== false;
     return s;
   }
   function createState(students, initialSeed) {
@@ -114,7 +117,11 @@
     return { version: 1, className: '演示班级', demo: true, students: list, cols: Math.max(...list.map(s => s.col)), settings: settings(), rngState: initialSeed == null ? seed() : initialSeed >>> 0, counts: {}, lastSeen: {}, fairnessStats: {}, cycleSeen: [], round: 0, lastId: null, lock: null, directionCooldownRemaining: 0, history: [] };
   }
   function createEmptyState(initialSeed) {
-    return { version: 1, className: '尚未配置名单', demo: false, students: [], cols: 8, settings: settings(), rngState: initialSeed == null ? seed() : initialSeed >>> 0, counts: {}, lastSeen: {}, fairnessStats: {}, cycleSeen: [], round: 0, lastId: null, lock: null, directionCooldownRemaining: 0, history: [] };
+    const state = { version: 1, className: '尚未配置名单', demo: false, students: [], cols: 8, settings: settings(), rngState: initialSeed == null ? seed() : initialSeed >>> 0, counts: {}, lastSeen: {}, fairnessStats: {}, cycleSeen: [], round: 0, lastId: null, lock: null, directionCooldownRemaining: 0, history: [] };
+    // The only state that starts the first-run flow; every other path uses the
+    // already-configured default from settings() or copies the current settings.
+    state.settings.onboardingCompleted = false;
+    return state;
   }
   function recentIds(state, activeCount) {
     const window = Math.min(state.settings.cooldown, Math.max(0, activeCount - 1));

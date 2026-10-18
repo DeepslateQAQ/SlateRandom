@@ -2,6 +2,30 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import engine from '../../../../src/renderer/domain/engine';
 import { completeImportLayout, prepareImport } from '../../../../src/renderer/domain/import';
+import type { Settings } from '../../../../src/shared/domain/model';
+
+test('only a brand-new state starts the first-run flow while every restored legacy save stays completed', () => {
+  assert.equal(engine.createEmptyState(123).settings.onboardingCompleted, false);
+  assert.equal(engine.settings().onboardingCompleted, true);
+  assert.equal(engine.createState([{ id: '1', name: '甲', row: 1, col: 1 }], 7).settings.onboardingCompleted, true);
+
+  const legacyClass = engine.createState([{ id: '1', name: '甲', row: 1, col: 1 }], 7);
+  delete (legacyClass.settings as Partial<Settings>).onboardingCompleted;
+  assert.equal(engine.restoreState(engine.clone(legacyClass)).settings.onboardingCompleted, true);
+
+  const legacyEmpty = engine.createEmptyState(123);
+  delete (legacyEmpty.settings as Partial<Settings>).onboardingCompleted;
+  assert.equal(engine.restoreState(engine.clone(legacyEmpty)).settings.onboardingCompleted, true);
+
+  // A save from an unfinished first run keeps both the flag and the whole state.
+  const interrupted = engine.createEmptyState(123);
+  assert.deepEqual(engine.restoreState(engine.clone(interrupted)), interrupted);
+
+  // Only an explicit false survives normalization; anything else means configured.
+  assert.equal(engine.settings({ onboardingCompleted: false }).onboardingCompleted, false);
+  assert.equal(engine.settings({ onboardingCompleted: 'false' }).onboardingCompleted, true);
+  assert.equal(engine.settings({ onboardingCompleted: 0 }).onboardingCompleted, true);
+});
 
 test('unconfigured state persists settings and seed without creating demo students or consuming PRNG', () => {
   const state = engine.createEmptyState(123);

@@ -49,6 +49,8 @@ export interface Settings {
   customCss: string;
   customCssEnabled: boolean;
   backgroundTint: boolean;
+  /** Missing on older data, where settings() normalizes it to true; only a brand-new state is false. */
+  onboardingCompleted: boolean;
 }
 
 export interface FairnessStats {
