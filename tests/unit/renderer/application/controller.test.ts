@@ -22,6 +22,13 @@ type Credentials = Required<backup.BackupCredentials>;
 type ProviderSettings = backup.ProviderSettings;
 const copy = engine.clone;
 const checkpoint = () => new Promise<void>(resolve => setImmediate(resolve));
+async function eventually(check: () => boolean, message: string) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    if (check()) return;
+    await checkpoint();
+  }
+  assert.fail(message);
+}
 interface Deferred<T> { promise: Promise<T>; resolve(value: T): void; reject(reason: unknown): void }
 export function deferred<T = void>(): Deferred<T> {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -43,7 +50,7 @@ export const nextCredentials: Credentials = { vision: { active: 'vision-fixture'
 // Only stage/camera presentation is replaced; import, draw, restore and save logic
 // run unchanged in their own VM, without modifying browser globals or production APIs.
 type Listener = (event: FakeEvent) => unknown;
-interface FakeEvent { target: FakeElement; type: string; defaultPrevented: boolean; preventDefault(): void; stopPropagation(): void; [key: string]: unknown }
+interface FakeEvent { target: FakeElement | FakeDom; type: string; defaultPrevented: boolean; preventDefault(): void; stopPropagation(): void; [key: string]: unknown }
 class FakeEvents {
   readonly listeners = new Map<string, Listener[]>();
   addEventListener(type: string, listener: Listener) { const list = this.listeners.get(type) || []; list.push(listener); this.listeners.set(type, list); }
@@ -118,10 +125,10 @@ class FakeDom extends FakeEvents {
   };
   querySelector = (selector: string) => selector === '.draw-screen' ? this.screen : this.querySelectorAll(selector)[0] || null;
   querySelectorAll = (selector: string): FakeElement[] => Array.from(this.elements.values()).flatMap(element => [...(element.matches(selector) ? [element] : []), ...element.querySelectorAll(selector)]);
-  async emit(target: FakeElement, type: string, detail: Record<string, unknown> = {}, bubble = true) {
+  async emit(target: FakeElement | FakeDom, type: string, detail: Record<string, unknown> = {}, bubble = true) {
     let stopped = false;
     const event: FakeEvent = { target, type, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { stopped = true; }, ...detail };
-    const work = target.invoke(type, event); if (bubble && !stopped) work.push(...this.invoke(type, event));
+    const work = target.invoke(type, event); if (bubble && target !== this && !stopped) work.push(...this.invoke(type, event));
     await Promise.all(work);
   }
   async delegate(dataset: Record<string, string>) { const target = new FakeElement('', this); Object.assign(target.dataset, dataset); await this.emit(target, 'click'); }
@@ -164,7 +171,13 @@ class Provider {
   loaded: ProviderSettings;
   constructor(readonly scope: Scope, readonly vault: Credentials, readonly trace: string[]) { this.loaded = copy(vault[scope]); this.presets = [{ id: vault[scope].active }]; }
   init(options: { canWrite: () => boolean }) { this.initOptions = options; }
-  async exportSettings(options: { includeSecrets: boolean }) { this.trace.push(this.scope + '.export'); this.exports.push(copy(options)); return copy(this.vault[this.scope]); }
+  async exportSettings(options: { includeSecrets: boolean }) {
+    this.trace.push(this.scope + '.export'); this.exports.push(copy(options));
+    const value = copy(this.vault[this.scope]);
+    // Mirrors the real providers: keys are only part of the snapshot on request.
+    if (!options.includeSecrets) value.records = value.records.map(record => { const clean = { ...record }; delete clean.key; return clean; });
+    return value;
+  }
   async prepareSettings(value: ProviderSettings) { return copy(value); }
   async importSettings(value: ProviderSettings) {
     const number = this.imports.push(copy(value)); this.trace.push(this.scope + '.import.' + number); this.importStarted.get(number)?.resolve();
@@ -233,12 +246,22 @@ export class NativeData implements NativeDataAdapter {
 type LoadOverride = (fallback: ClassState) => ClassLoadResult;
 interface FriendControls { commitTargets(source: string, targets: string[]): boolean; isBusy(): boolean }
 interface RenderStyleControls { onChange(style: string): Promise<boolean> }
+interface ImportRequest { kind: string; name?: string; bytes?: Uint8Array }
+/** The controller reaches the host through `window`; tests need the same object. */
+export interface FakeWindow extends FakeEvents {
+  location: { href: string };
+  __slateRendererReady?: boolean;
+  __slateTriggerDraw?: () => boolean;
+  slateDesktop?: { role?: string; onImportRequest?(callback: (payload: ImportRequest) => void): () => void; [key: string]: unknown };
+  [key: string]: unknown;
+}
 /** Everything a behavioral test (or the /tmp smoke script) needs to drive and inspect a mounted controller. */
 export interface Harness {
   previous: ClassState;
   next: ClassState;
   trace: string[];
   vault: Credentials;
+  window: FakeWindow;
   dom: FakeDom;
   clock: Clock;
   storage: FaultStorage;
@@ -253,6 +276,9 @@ export interface Harness {
   downloads: (TextDownload | BinaryDownload)[];
   desktopUpdates: Partial<DesktopSettings>[];
   desktopUpdateFlags: (boolean | undefined)[];
+  importCallbacks: ((payload: ImportRequest) => void)[];
+  clipboardWrites: string[];
+  hostEvent(type: string, detail: unknown): Promise<void>;
   actions: ApplicationActions;
   element(id: string): FakeElement;
   click(id: string): Promise<void>;
@@ -269,7 +295,7 @@ export interface Harness {
 export function harness(options: { native?: 'committed' | 'pending-recovery'; nativeData?: NativeDataAdapter; recovery?: boolean; initial?: ClassState } = {}): Harness {
   const injected = options.nativeData;
   const previous = options.initial ? copy(options.initial) : injected ? copy(injected.loadClass()) : configured(), next = configured('恢复班级', 3), trace: string[] = [], vault = copy(oldCredentials);
-  const dom = new FakeDom(), clock = new Clock(), storage = new FaultStorage(), downloads: (TextDownload | BinaryDownload)[] = [], desktopUpdates: Partial<DesktopSettings>[] = [], desktopUpdateFlags: (boolean | undefined)[] = [];
+  const dom = new FakeDom(), clock = new Clock(), storage = new FaultStorage(), downloads: (TextDownload | BinaryDownload)[] = [], desktopUpdates: Partial<DesktopSettings>[] = [], desktopUpdateFlags: (boolean | undefined)[] = [], importCallbacks: ((payload: ImportRequest) => void)[] = [], clipboardWrites: string[] = [];
   storage.items.set(CLASS_STORAGE_KEY, JSON.stringify(previous));
   const native = options.native ? new NativeData(previous, vault, trace, options.native) : null;
   const adapter: NativeDataAdapter | null = injected || native;
@@ -285,22 +311,36 @@ export function harness(options: { native?: 'committed' | 'pending-recovery'; na
     },
     save(state) { if (adapter) nativeSaves.push(copy(state)); else browser.save(state); }
   };
-  const store = createAppStore(previous), closed: string[] = [];
+  const store = createAppStore(previous), closed: string[] = [], modals: FakeElement[] = [];
   let friendOptions!: FriendControls;
   let renderStyleOptions!: RenderStyleControls;
   const friend = { init(value: FriendControls) { friendOptions = value; }, sync() {}, hide() {}, select() {} };
   const window = Object.assign(new FakeEvents(), {
     location: { href: 'https://slate.example/' }, VisionProviders: vision, SpeechProviders: speech, FriendSeatConfig: friend,
-    DialogTransitions: { init() {}, register() {}, topModal() { return null; }, async open(dialog: FakeElement) { dialog.open = true; }, async close(dialog: FakeElement) { dialog.open = false; closed.push(dialog.id); await dom.emit(dialog, 'close', {}, false); } },
+    DialogTransitions: {
+      init() {}, register() {},
+      topModal() { return modals.at(-1) || null; },
+      async open(dialog: FakeElement) { dialog.open = true; if (!modals.includes(dialog)) modals.push(dialog); },
+      async close(dialog: FakeElement) {
+        dialog.open = false; closed.push(dialog.id);
+        const index = modals.indexOf(dialog); if (index >= 0) modals.splice(index, 1);
+        await dom.emit(dialog, 'close', {}, false);
+      }
+    },
     RenderStyleUI: { init(value: RenderStyleControls) { renderStyleOptions = value; }, sync() {} },
     SeatTransitions: { async enter() {}, async exit() {}, clear() {} }, FriendTransitions: { async play() {}, clear() {} },
     matchMedia: () => ({ matches: true }),
     ...(adapter ? { slateDesktop: { role: 'main', data: adapter, state: async () => ({ settings: {} }),
-      updateSettings: async (patch: Partial<DesktopSettings>) => { desktopUpdates.push(copy(patch)); desktopUpdateFlags.push(nativeSaves.at(-1)?.settings.onboardingCompleted); return { settings: {}, runtime: {} }; } } } : {})
-  });
+      updateSettings: async (patch: Partial<DesktopSettings>) => { desktopUpdates.push(copy(patch)); desktopUpdateFlags.push(nativeSaves.at(-1)?.settings.onboardingCompleted); return { settings: {}, runtime: {} }; },
+      onImportRequest(callback: (payload: ImportRequest) => void) {
+        importCallbacks.push(callback);
+        return () => { const index = importCallbacks.indexOf(callback); if (index >= 0) importCallbacks.splice(index, 1); };
+      } } } : {})
+  }) as unknown as FakeWindow;
   const sandbox = vm.createContext({
     window, document: dom, FriendSeatConfig: friend, URL, Date, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, AbortController,
-    navigator: {}, console, queueMicrotask, performance: { now: () => 0 },
+    btoa, atob, crypto: globalThis.crypto, Blob, CompressionStream, DecompressionStream,
+    navigator: { clipboard: { writeText: async (text: string) => { clipboardWrites.push(text); } } }, console, queueMicrotask, performance: { now: () => 0 },
     setTimeout: clock.setTimeout, clearTimeout: clock.clear, setInterval: clock.setInterval, clearInterval: clock.clear,
     requestAnimationFrame: (callback: (time: number) => void) => { queueMicrotask(() => callback(0)); return 1; }, cancelAnimationFrame() {},
     getComputedStyle: () => ({ transform: 'none', backgroundColor: 'black', borderTopWidth: '0px', color: 'black' }),
@@ -343,9 +383,10 @@ export function harness(options: { native?: 'committed' | 'pending-recovery'; na
     ? { format: 'SlateRandom.backup', version: 1, kind, roster: backup.rosterSnapshot(next) }
     : { format: 'SlateRandom.backup', version: 1, kind, settings: next.settings, credentials: nextCredentials, desktopSettings: null });
   async function restore() { await stageRestore(); assert.equal(element('confirmDialog').open, true, 'the real file-change handler requests confirmation'); await click('confirmActionBtn'); }
+  const hostEvent = (type: string, detail: unknown) => dom.emit(dom, type, { detail });
   return {
-    previous, next, trace, vault, dom, clock, storage, native, adapter, vision, speech, loadFallbacks, nativeSaves, store, closed, downloads, actions, element, click, submit, importDocument, stageRestore, stagePartial, restore,
-    desktopUpdates, desktopUpdateFlags,
+    previous, next, trace, vault, window, dom, clock, storage, native, adapter, vision, speech, loadFallbacks, nativeSaves, store, closed, downloads, actions, element, click, submit, importDocument, stageRestore, stagePartial, restore,
+    desktopUpdates, desktopUpdateFlags, importCallbacks, clipboardWrites, hostEvent,
     get snapshot() { return store.snapshot.value; }, get friend() { return friendOptions; }, get renderStyle() { return renderStyleOptions; },
     overrideLoad(value: LoadOverride | null) { loadOverride = value; }
   };
@@ -759,4 +800,101 @@ test('the tray settings command stays out of the way while the first-run flow ow
   h.actions.dismissOnboardingForSession();
   await h.dom.emit(h.element('drawBtn'), 'slate:open-settings');
   assert.equal(h.element('configDialog').open, true);
+});
+
+test('mount installs the protocol hooks and marks the renderer ready', () => {
+  const h = harness();
+  assert.equal(h.window.__slateRendererReady, true);
+  assert.equal(typeof h.window.__slateTriggerDraw, 'function');
+});
+
+test('the host draw hook accepts one idle draw then refuses while busy, with a dialog open or in recovery', async () => {
+  const h = harness();
+  assert.equal(h.window.__slateTriggerDraw!(), true);
+  await checkpoint();
+  assert.equal(h.snapshot.busy, true);
+  assert.equal(h.window.__slateTriggerDraw!(), false);
+
+  const blocked = harness();
+  blocked.element('configDialog').open = true;
+  assert.equal(blocked.window.__slateTriggerDraw!(), false);
+
+  const recovery = harness({ recovery: true });
+  assert.equal(recovery.window.__slateTriggerDraw!(), false);
+});
+
+test('host settings commands open and close the settings dialog including nested dialogs', async () => {
+  const h = harness();
+  await h.hostEvent('slate:settings-command', { action: 'open' });
+  assert.equal(h.element('configDialog').open, true);
+  assert.equal(h.snapshot.view, 'general');
+
+  h.actions.openSettings();
+  assert.equal(h.element('settingsDialog').open, true);
+  await h.hostEvent('slate:settings-command', { action: 'close' });
+  await checkpoint();
+  assert.equal(h.element('settingsDialog').open, false);
+  assert.equal(h.element('configDialog').open, false);
+  assert.deepEqual(h.closed.filter(id => id === 'settingsDialog' || id === 'configDialog'), ['settingsDialog', 'configDialog']);
+});
+
+test('host settings toggle opens a closed dialog and closes an open one', async () => {
+  const h = harness();
+  await h.hostEvent('slate:settings-command', { action: 'toggle' });
+  assert.equal(h.element('configDialog').open, true);
+  await h.hostEvent('slate:settings-command', { action: 'toggle' });
+  assert.equal(h.element('configDialog').open, false);
+  assert.ok(h.closed.includes('configDialog'));
+});
+
+test('desktop import requests open the standard confirmation and invalid payloads are ignored', async () => {
+  const h = harness({ native: 'committed' });
+  assert.equal(h.importCallbacks.length, 1);
+  const bytes = await backup.encodeBackup({ format: 'SlateRandomBackup', version: 1, kind: 'all', state: h.next, credentials: nextCredentials, desktop: null });
+  h.importCallbacks[0]!({ kind: 'all', name: '恢复.slate', bytes });
+  await eventually(() => h.element('confirmDialog').open, 'the host import asks for confirmation');
+  assert.match(h.element('confirmText').textContent, /恢复班级/);
+  await h.click('confirmActionBtn');
+  assertSettled(h, h.next, false);
+  assert.equal(h.element('confirmDialog').open, false);
+  assert.equal(h.native!.restores.length, 1);
+
+  const ignored = harness({ native: 'committed' });
+  ignored.importCallbacks[0]!({ kind: 'bogus', name: '恢复.slate', bytes });
+  ignored.importCallbacks[0]!({ kind: 'all', name: '恢复.slate', bytes: new Uint8Array() });
+  await checkpoint();
+  assert.equal(ignored.element('confirmDialog').open, false);
+  assert.equal(ignored.snapshot.busy, false);
+});
+
+test('a host protocol notice becomes a toast', async () => {
+  const h = harness();
+  await h.hostEvent('slate:protocol-notice', { message: '备份无法读取' });
+  assert.equal(h.element('toast').textContent, '备份无法读取');
+});
+
+test('Lite send-to-desktop writes an import envelope without or with provider keys', async () => {
+  async function send(h: Harness, includeSecrets: boolean) {
+    h.element('includeSecretsToggle').checked = includeSecrets;
+    await h.click('sendToDesktopBtn');
+    await eventually(() => h.clipboardWrites.length === 1 && !h.snapshot.busy, 'send-to-desktop finishes');
+    const payload = JSON.parse(h.clipboardWrites[0]!) as { format: string; version: number; kind: string; name: string; data: string };
+    assert.equal(payload.format, 'SlateRandom.protocol-import');
+    assert.equal(payload.version, 1);
+    assert.equal(payload.kind, 'all');
+    assert.match(payload.name, /\.slate$/);
+    assert.equal(h.window.location.href, 'slaterandom://import?kind=all&source=clipboard');
+    return backup.readBackup(Uint8Array.from(Buffer.from(payload.data, 'base64')));
+  }
+
+  const withoutSecrets = await send(harness(), false);
+  if (withoutSecrets.kind !== 'all') assert.fail('the envelope carries a full backup');
+  assert.equal(withoutSecrets.state.className, '原班级');
+  assert.equal(Object.hasOwn(withoutSecrets.credentials.vision!.records[0]!, 'key'), false);
+  assert.equal(Object.hasOwn(withoutSecrets.credentials.speech!.records[0]!, 'key'), false);
+
+  const withSecrets = await send(harness(), true);
+  if (withSecrets.kind !== 'all') assert.fail('the envelope carries a full backup');
+  assert.equal(withSecrets.credentials.vision!.records[0]!.key, oldCredentials.vision.records[0]!.key);
+  assert.equal(withSecrets.credentials.speech!.records[0]!.key, oldCredentials.speech.records[0]!.key);
 });

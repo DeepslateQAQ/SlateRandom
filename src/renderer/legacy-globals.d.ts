@@ -2,6 +2,10 @@ export {};
 
 declare global {
   interface Window {
+    /** Host-driven draw hook; returns whether a draw was accepted. */
+    __slateTriggerDraw?: () => boolean;
+    /** Raised once the controller finished installing its host contract. */
+    __slateRendererReady?: boolean;
     VisionProviders?: {
       open(): Promise<void>;
       completeTheme(prompt: string, options?: {

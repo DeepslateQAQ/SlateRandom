@@ -505,6 +505,37 @@ export function mountController({ store, repository, filePort, fullscreenPort })
     const message = { roster: '名单已导出，未包含累计公平统计。', settings: '设置已导出，名单和累计公平统计未改变。', all: '全部数据已导出为带完整性校验的便携备份。' }[kind];
     dataStatus(message); toast(message);
   }
+  /** Lite only: hand the desktop build a full backup through the clipboard protocol. */
+  async function sendToDesktop() {
+    if (window.slateDesktop) return;
+    const createdAt = new Date().toISOString();
+    const stamp = createdAt.slice(0, 19).replace(/[:T]/g, '-');
+    const credentials = await credentialsSnapshot($('includeSecretsToggle').checked);
+    const bytes = await encodeBackup({
+      format: 'SlateRandomBackup', version: 1, kind: 'all', createdAt,
+      state: C.clone(state), credentials, desktop: null
+    });
+    // Chunked to keep String.fromCharCode far below the argument-count limit.
+    const binary = (() => {
+      let text = '';
+      const chunk = 0x8000;
+      for (let index = 0; index < bytes.length; index += chunk) {
+        text += String.fromCharCode(...bytes.subarray(index, index + chunk));
+      }
+      return btoa(text);
+    })();
+    const payload = {
+      format: 'SlateRandom.protocol-import',
+      version: 1,
+      kind: 'all',
+      name: safeFilename(state.className) + '-SlateRandom-all-' + stamp + '.slate',
+      data: binary
+    };
+    await navigator.clipboard.writeText(JSON.stringify(payload));
+    dataStatus('全部备份已复制，正在打开桌面版…');
+    toast('正在发送到桌面版，请在桌面版确认恢复。');
+    window.location.href = 'slaterandom://import?kind=all&source=clipboard';
+  }
   function acceptRestoredData(next) {
     state = next; resultVisible = next.history.length > 0; swapMode = false; swapFirst = null; historyPage = 0;
     window.FriendSeatConfig.hide(); render();
@@ -716,13 +747,7 @@ export function mountController({ store, repository, filePort, fullscreenPort })
     setView(next); render(); window.DialogTransitions.open($('configDialog'));
     drawButton.setAttribute('aria-expanded', 'true');
   }
-  document.addEventListener('slate:open-settings', () => {
-    if (!readOnlyAvailable()) return;
-    // The first-run flow owns the window; the tray must not stack settings on it.
-    if (onboardingActive()) return;
-    if ($('configDialog').open) { setView('general'); return; }
-    openConfig('general');
-  });
+  document.addEventListener('slate:open-settings', openSettingsFromHost);
   function beginHold(kind, id, x = 0, y = 0) {
     if (hold || busy || quitConfirming() || $$('dialog[open]').length) return;
     cancelPendingDraw(); clearProgressRelease(drawButton); pointerRelease = null;
@@ -903,6 +928,9 @@ export function mountController({ store, repository, filePort, fullscreenPort })
   installBackupImport('importSettingsBtn', 'settingsBackupFile', 'settings');
   installBackupImport('importRosterBtn', 'rosterBackupFile', 'roster');
   installBackupImport('restoreBackupBtn', 'backupFile', 'all');
+  $('sendToDesktopBtn')?.addEventListener('click', () => {
+    void runDataAction(sendToDesktop, { readOnly: true });
+  });
   $('exportHistoryBtn').addEventListener('click', exportHistory);
   
   function installResetHold(button) {
@@ -978,6 +1006,60 @@ export function mountController({ store, repository, filePort, fullscreenPort })
   void refreshDataInfo();
   if (loadWarning) setTimeout(() => toast(loadWarning), 200);
 
+  // Protocol contract --------------------------------------------------------
+  // The main process polls __slateRendererReady before dispatching anything, and
+  // asks __slateTriggerDraw whether a draw was actually accepted. Both are
+  // installed last so no protocol call can observe a half-mounted controller.
+  function openSettingsFromHost() {
+    if (!readOnlyAvailable()) return;
+    // The first-run flow owns the window; the tray must not stack settings on it.
+    if (onboardingActive()) return;
+    if ($('configDialog').open) { setView('general'); return; }
+    openConfig('general');
+  }
+  async function closeSettingsFromHost() {
+    // Modal dialogs stack; unwind the top layer at most 8 times and give up.
+    for (let attempt = 0; attempt < 8 && $('configDialog').open; attempt++) {
+      const top = window.DialogTransitions.topModal();
+      if (!top) break;
+      await window.DialogTransitions.close(top);
+      if (top.open) break;
+    }
+    if ($('configDialog').open) toast('有未完成的对话框，暂时无法关闭设置。');
+  }
+  window.__slateTriggerDraw = () => {
+    if (!booted || onboardingActive() || recoveryRequired || busy || quitConfirming()) return false;
+    if (hold || pendingDrawTimer || $$('dialog[open]').length) return false;
+    void startDraw();
+    return true;
+  };
+  document.addEventListener('slate:settings-command', event => {
+    const action = event?.detail?.action;
+    if (action === 'open') openSettingsFromHost();
+    else if (action === 'close') void closeSettingsFromHost();
+    else if (action === 'toggle') {
+      if ($('configDialog').open) void closeSettingsFromHost();
+      else openSettingsFromHost();
+    }
+  });
+  document.addEventListener('slate:protocol-notice', event => {
+    const message = event?.detail?.message;
+    if (typeof message === 'string' && message) toast(message);
+  });
+  // Host-driven imports reuse the file confirmation path instead of a second one.
+  window.slateDesktop?.onImportRequest?.(payload => {
+    if (!payload || !['all', 'settings', 'roster'].includes(payload.kind)) return;
+    const bytes = payload.bytes instanceof Uint8Array ? payload.bytes : new Uint8Array(payload.bytes || []);
+    if (!bytes.byteLength) return;
+    const file = {
+      name: String(payload.name || 'SlateRandom 备份'),
+      size: bytes.byteLength,
+      async arrayBuffer() { return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength); }
+    };
+    void importBackupFile(file, payload.kind);
+  });
+  window.__slateRendererReady = true;
+
   return {
     setView, openSettings, exitChain,
     toggleMode(mode, enabled) {
@@ -991,6 +1073,7 @@ export function mountController({ store, repository, filePort, fullscreenPort })
     openRosterImport() { if (available()) openImport(); },
     restoreAllFile(file) { return importBackupFile(file, 'all'); },
     restoreRosterFile(file) { return importBackupFile(file, 'roster'); },
+    restoreSettingsFile(file) { return importBackupFile(file, 'settings'); },
     skipOnboarding() {
       if (!available() || state.settings.onboardingCompleted) return false;
       if (!persistOnboarding(true)) return false;

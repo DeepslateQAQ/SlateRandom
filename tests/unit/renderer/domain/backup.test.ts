@@ -50,6 +50,21 @@ test('manual elevation preferences round-trip while old backups remain readable'
   assert.deepEqual(legacy.desktopSettings, original.desktop);
   await assert.rejects(readBackup(nativeFrame({ ...original, desktop: { manualElevation: 'task' } })), /完整备份校验失败/);
 });
+test('desktop protocol preferences round-trip while non-boolean values are rejected', async () => {
+  const original = payload(), desktop = {
+    ...original.desktop, drawOnBallClick: true, externalDrawProtocols: true, slaterandomProtocol: false
+  };
+  const bytes = await encodeBackup({ ...original, desktop });
+  const restored = await readBackup(bytes, 'all');
+  assert.equal(restored.kind, 'all');
+  if (restored.kind !== 'all') throw new Error('Expected full backup');
+  assert.deepEqual(restored.desktopSettings, desktop);
+  assert.deepEqual(native.readBackup(Buffer.from(bytes), 'all').desktopSettings, desktop);
+  // Binary full backups report desktop validation failures through the integrity wrapper.
+  await assert.rejects(readBackup(nativeFrame({ ...original, desktop: { ...desktop, slaterandomProtocol: 'true' } })), /完整备份校验失败/);
+  await assert.rejects(readBackup(nativeFrame({ ...original, desktop: { ...desktop, drawOnBallClick: 1 } })), /完整备份校验失败/);
+  await assert.rejects(readBackup(nativeFrame({ ...original, desktop: { ...desktop, arbitrary: 'invalid' } })), /完整备份校验失败/);
+});
 test('native exported full backup can be restored by the HTML codec', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slate-codec-')); t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const store = native.createPortableStore({ directory }); store.save(configured()); store.writeCredentials('vision', credentials.vision); store.writeCredentials('speech', credentials.speech);

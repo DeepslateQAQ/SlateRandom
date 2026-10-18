@@ -113,7 +113,7 @@ function pointerUp(event: PointerEvent): void {
   }
   const { result, dragId } = releasePointer(false);
   if (dragId) void dragSession.end(dragId);
-  else if (result === 'click') void action(() => bridge!.openMain());
+  else if (result === 'click') void action(() => bridge!.openMain({ draw: true }));
 }
 
 function pointerCancel(event: PointerEvent): void {
@@ -135,7 +135,7 @@ function keyboard(event: KeyboardEvent): void {
   if (event.key !== ' ' && event.key !== 'Enter') return;
   event.preventDefault();
   if (event.repeat || expanded.value) return;
-  void action(() => bridge!.openMain());
+  void action(() => bridge!.openMain({ draw: true }));
 }
 
 const stopNativeWatch = watch(() => state.value?.ball.dragId, (id, previous) => {

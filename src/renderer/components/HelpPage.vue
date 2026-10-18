@@ -24,6 +24,8 @@
         <p>短按抽选按钮或空格键抽人。按住不足 200 ms 松手视为短按，200～500 ms 松手仅撤回进度，持续 500 ms 打开设置。R 键与重置按钮均需长按 500 ms；Q 键退出连坐。</p>
         <p>点击右下角「全览」按钮，在普通与全览之间切换；按钮亮起时始终显示所有座位。普通视图跟随当前焦点。按钮支持触摸、回车与空格操作。</p>
         <p>桌面版点击悬浮球打开主界面，左下角红色按钮收回主界面。拖动悬浮球靠近左右屏幕边缘会吸附，按住悬浮球 3 秒后确认退出。</p>
+        <p>桌面版还可用 <code>slaterandom://</code> 从外部控制：<code>slaterandom://pick</code> 立刻抽人，<code>slaterandom://main/show</code>、<code>hide</code>、<code>toggle</code> 控制主界面，<code>slaterandom://settings/show</code>、<code>hide</code>、<code>toggle</code> 开关设置，<code>slaterandom://ball/show</code>、<code>hide</code>、<code>toggle</code>、<code>click</code> 控制悬浮球，<code>slaterandom://import</code> 配合 <code>kind</code> 与 <code>source</code> 参数导入备份。动作也可写成 <code>?action=</code> 查询形式。</p>
+        <p>浏览器版可在「数据」页使用「发送到桌面版」：按「备份中包含 API 密钥」开关导出全部备份、写入剪贴板，再唤醒桌面版确认恢复。</p>
       </article>
       <article class="card help-card"><span class="help-number">05</span><h2>备份与便携数据</h2>
         <p>「数据」页面统一管理备份。设置与名单可各自导出 JSON；「导出全部」还包含累计公平统计和当前抽取进度，可在另一台设备恢复。API 密钥默认不写入导出文件，需要时手动开启「备份中包含 API 密钥」。</p>

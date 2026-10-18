@@ -486,7 +486,7 @@ onBeforeUnmount(() => {
     <label v-if="!desktop" class="desktop-setting-row"><span><strong>全屏显示</strong><small>使用完整屏幕显示抽选画面，可按 Esc 退出。</small></span><input id="liteFullscreenInput" type="checkbox" class="rect-switch" role="switch" aria-label="全屏显示" :checked="fullscreen" :disabled="!fullscreenAvailable" @change="toggleFullscreen"></label>
     <p v-if="fullscreenError" class="error-message" role="alert">{{ fullscreenError }}</p>
     <article class="settings-info-section"><h3>{{ desktop ? '窗口操作' : '画面与操作' }}</h3>
-      <p v-if="desktop">点击悬浮球打开主界面，左下角红色关闭按钮收回主界面。拖动悬浮球靠近屏幕左右边缘即可吸附；按住 3 秒后确认可退出程序。</p>
+      <p v-if="desktop">点击悬浮球打开主界面，左下角红色关闭按钮收回主界面。拖动悬浮球靠近屏幕左右边缘即可吸附；按住 3 秒后确认可退出程序。可在上方开启单击悬浮球立即抽选、外部点名协议或 SlateRandom 协议。</p>
       <p>点击右下角「全览」按钮显示全部座位，再次点击返回普通视图；按钮亮起表示已开启全览。</p>
       <p class="field-hint">抽选模式、动画和朗读在「功能」页面配置；名单导入与座位编辑在「名单」页面管理。</p>
     </article>

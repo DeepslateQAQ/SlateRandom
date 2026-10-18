@@ -11,7 +11,8 @@ import {
 
 const settings: DesktopSettings = {
   autostart: false, uac: true, uiAccess: false, showFloatingBall: true,
-  manualElevation: 'uac', autostartElevation: 'uac'
+  manualElevation: 'uac', autostartElevation: 'uac',
+  drawOnBallClick: false, externalDrawProtocols: false, slaterandomProtocol: true
 };
 const draft = (patch: Partial<DesktopDraft> = {}): DesktopDraft => ({
   uac: true, uiAccess: false, manualElevation: 'uac', autostartElevation: 'uac', ...patch

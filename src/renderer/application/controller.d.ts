@@ -16,6 +16,7 @@ export interface ApplicationActions {
   openRosterImport(): void;
   restoreAllFile(file: File): Promise<void>;
   restoreRosterFile(file: File): Promise<void>;
+  restoreSettingsFile(file: File): Promise<void>;
   finishOnboarding(desktopPatch?: Partial<DesktopSettings>): Promise<boolean>;
   skipOnboarding(): boolean;
   restartOnboarding(): Promise<boolean>;

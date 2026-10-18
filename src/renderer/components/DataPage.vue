@@ -33,7 +33,7 @@ const desktop = Boolean(window.slateDesktop);
         <input id="rosterBackupFile" type="file" accept=".json,application/json" class="sr-only" tabindex="-1" :disabled="blocked">
       </article>
       <article class="backup-row backup-row-all" aria-labelledby="allBackupTitle"><div class="backup-copy"><h3 id="allBackupTitle">全部数据</h3><p>同时备份名单、设置、累计公平统计与抽取进度，可在另一台设备恢复继续使用。</p></div>
-        <div class="backup-actions"><button id="backupBtn" type="button" class="btn btn-primary" :disabled="blocked"><span class="icon material-icon" aria-hidden="true">download</span>导出全部</button><button id="restoreBackupBtn" type="button" class="btn btn-plain" :disabled="busy"><span class="icon material-icon" aria-hidden="true">upload</span>恢复全部</button></div>
+        <div class="backup-actions"><button id="backupBtn" type="button" class="btn btn-primary" :disabled="blocked"><span class="icon material-icon" aria-hidden="true">download</span>导出全部</button><button id="restoreBackupBtn" type="button" class="btn btn-plain" :disabled="busy"><span class="icon material-icon" aria-hidden="true">upload</span>恢复全部</button><button v-if="!desktop" id="sendToDesktopBtn" type="button" class="btn btn-plain" :disabled="blocked"><span class="icon material-icon" aria-hidden="true">upload</span>发送到桌面版</button></div>
         <input id="backupFile" type="file" accept=".slate,.slatebackup,.json,application/json,application/octet-stream" class="sr-only" tabindex="-1" :disabled="busy">
       </article>
       <article class="backup-row backup-row-analysis" aria-labelledby="analysisTitle"><div class="backup-copy"><h3 id="analysisTitle">分析报告</h3><p>导出运行环境、匿名化名单统计与抽取记录，便于在 Issue 中排查问题。不包含姓名、学号、班级、密钥或备份凭据；学生仅以匿名键出现。</p></div>

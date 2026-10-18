@@ -12,7 +12,7 @@ const selectedMethod = computed(() => {
   return !settings?.uac ? 'disabled' : settings.autostart ? settings.autostartElevation : settings.manualElevation;
 });
 
-async function toggle(key: 'autostart' | 'uiAccess' | 'showFloatingBall', event: Event): Promise<void> {
+async function toggle(key: 'autostart' | 'uiAccess' | 'showFloatingBall' | 'drawOnBallClick' | 'externalDrawProtocols' | 'slaterandomProtocol', event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   await updateDesktopSettings({ [key]: input.checked });
   input.checked = state.value?.settings[key] ?? false;
@@ -44,6 +44,15 @@ async function changeElevation(event: Event): Promise<void> {
     <label class="desktop-setting-row"><span><strong>显示悬浮球</strong><small>关闭后启动时直接打开主界面</small></span>
       <input id="desktopShowBallInput" type="checkbox" class="rect-switch" role="switch" aria-label="显示悬浮球"
         :checked="state?.settings.showFloatingBall ?? true" :disabled="pending || !state" @change="toggle('showFloatingBall', $event)"></label>
+    <label class="desktop-setting-row"><span><strong>单击悬浮球立即抽选</strong><small>打开主界面后自动抽一位；拖动和长按不受影响，外部点名也跟随此开关。</small></span>
+      <input id="desktopDrawOnBallClickInput" type="checkbox" class="rect-switch" role="switch" aria-label="单击悬浮球立即抽选"
+        :checked="state?.settings.drawOnBallClick ?? false" :disabled="pending || !state" @change="toggle('drawOnBallClick', $event)"></label>
+    <label class="desktop-setting-row"><span><strong>外部点名协议</strong><small>允许 ICC-CE 等应用通过 secrandom:// 和 namepicker:// 调用岩选；启用时临时接管，关闭后恢复原关联。</small></span>
+      <input id="desktopExternalProtocolsInput" type="checkbox" class="rect-switch" role="switch" aria-label="外部点名协议"
+        :checked="state?.settings.externalDrawProtocols ?? false" :disabled="pending || !state" @change="toggle('externalDrawProtocols', $event)"></label>
+    <label class="desktop-setting-row"><span><strong>SlateRandom 协议</strong><small>允许通过 slaterandom:// 控制主界面、设置、悬浮球、立刻抽选和导入备份；关闭后恢复原关联。</small></span>
+      <input id="desktopSlateRandomProtocolInput" type="checkbox" class="rect-switch" role="switch" aria-label="SlateRandom 协议"
+        :checked="state?.settings.slaterandomProtocol ?? true" :disabled="pending || !state" @change="toggle('slaterandomProtocol', $event)"></label>
     <label class="desktop-setting-row"><span><strong>开机自启</strong><small>登录 Windows 时自动启动 SlateRandom</small></span>
       <input id="desktopAutostartInput" type="checkbox" class="rect-switch" role="switch" aria-label="开机自启"
         :checked="state?.settings.autostart ?? false" :disabled="pending || !state" @change="toggle('autostart', $event)"></label>
