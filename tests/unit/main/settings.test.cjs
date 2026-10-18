@@ -1,10 +1,10 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {patchSettings,createSettingsStore,normalizeSettings}=require('../../../src/main/settings.cjs');
+const {patchSettings,createSettingsStore,normalizeSettings,normalizeProtocolBackups}=require('../../../src/main/settings.cjs');
 test('UIAccess requires explicit UAC; disabling UAC also disables UIAccess',()=>{
   const initial=normalizeSettings({});assert.throws(()=>patchSettings(initial,{uiAccess:true}),/UAC/);
   const enabled=patchSettings(initial,{uac:true,uiAccess:true});assert.equal(enabled.uiAccess,true);
-  assert.deepEqual(patchSettings(enabled,{uac:false}),{autostart:false,uac:false,uiAccess:false,showFloatingBall:true,manualElevation:'uac',autostartElevation:'uac'});
+  assert.deepEqual(patchSettings(enabled,{uac:false}),{autostart:false,uac:false,uiAccess:false,showFloatingBall:true,manualElevation:'uac',autostartElevation:'uac',drawOnBallClick:false,externalDrawProtocols:false,slaterandomProtocol:true});
   assert.throws(()=>patchSettings(initial,{executable:'arbitrary.exe'}),/桌面设置/);
   assert.equal(patchSettings(initial,{autostartElevation:'task'}).autostartElevation,'task');
   assert.throws(()=>patchSettings(initial,{autostartElevation:'system'}),/启动方式/);
@@ -22,6 +22,24 @@ test('floating ball defaults on and persists independently of startup', () => {
     store.write(patchSettings(initial, { showFloatingBall: false }));
     assert.equal(createSettingsStore(dir).settings.showFloatingBall, false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('protocol preferences default off for external calls, on for the app scheme and reject non-booleans', () => {
+  const initial = normalizeSettings({});
+  assert.equal(initial.drawOnBallClick, false);
+  assert.equal(initial.externalDrawProtocols, false);
+  assert.equal(initial.slaterandomProtocol, true);
+  // Only an explicit false disables the app scheme; legacy documents stay enabled.
+  assert.equal(normalizeSettings({ slaterandomProtocol: false }).slaterandomProtocol, false);
+  assert.equal(normalizeSettings({ slaterandomProtocol: null }).slaterandomProtocol, true);
+  assert.equal(normalizeSettings({ slaterandomProtocol: 'false' }).slaterandomProtocol, true);
+  assert.equal(patchSettings(initial, { drawOnBallClick: true }).drawOnBallClick, true);
+  assert.equal(patchSettings(initial, { externalDrawProtocols: true }).externalDrawProtocols, true);
+  assert.equal(patchSettings(initial, { slaterandomProtocol: false }).slaterandomProtocol, false);
+  for (const key of ['drawOnBallClick', 'externalDrawProtocols', 'slaterandomProtocol']) {
+    assert.throws(() => patchSettings(initial, { [key]: 'true' }), /桌面设置/);
+    assert.throws(() => patchSettings(initial, { [key]: 1 }), /桌面设置/);
+  }
 });
 
 test('manual compatibility preference migrates independently and survives reopening without enabling startup', () => {
@@ -42,6 +60,34 @@ test('desktop preferences and ball position persist separately from classroom st
   try{const a=createSettingsStore(dir);a.write({autostart:true,uac:true,uiAccess:true});a.position({x:-880,y:206});const b=createSettingsStore(dir);assert.deepEqual(b.settings,a.settings);assert.deepEqual(b.ball,{x:-880,y:206});assert.equal(fs.readdirSync(dir).length,1);}finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('protocol backups round-trip in the single settings document and drop malformed entries', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'slate-protocols-'));
+  try {
+    const entries = {
+      secrandom: { existed: true, reg: 'UmVnU2VjcmFuZG9t' },
+      namepicker: { existed: false },
+      slaterandom: { existed: true, reg: 'UmVnU2xhdGVSYW5kb20=' }
+    };
+    const store = createSettingsStore(dir);
+    assert.equal(store.protocols, null);
+    // Unknown schemes never reach the file; a false entry cannot smuggle registry bytes.
+    store.protocols = { version: 1, entries: { ...entries, classisland: { existed: false }, arbitrary: { existed: true, reg: 'AAAA' }, namepicker: { existed: false, reg: 'AAAA' } } };
+    assert.deepEqual(store.protocols, { version: 1, entries });
+    store.write({ autostart: true }); store.position({ x: 12, y: -34 });
+    assert.deepEqual(fs.readdirSync(dir), ['desktop-settings.json']);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'desktop-settings.json'), 'utf8')).protocols, { version: 1, entries });
+    const reopened = createSettingsStore(dir);
+    assert.deepEqual(reopened.protocols, { version: 1, entries });
+    // An entry claiming an exported key must carry a non-empty base64 snapshot.
+    reopened.protocols = { version: 1, entries: { secrandom: { existed: true, reg: 'not base64!' }, namepicker: { existed: true, reg: '' }, slaterandom: { existed: true, reg: 'U2xhdGU=' } } };
+    assert.deepEqual(reopened.protocols, { version: 1, entries: { slaterandom: { existed: true, reg: 'U2xhdGU=' } } });
+    assert.deepEqual(createSettingsStore(dir).protocols, reopened.protocols);
+    assert.equal(normalizeProtocolBackups(null), null);
+    assert.equal(normalizeProtocolBackups({ version: 2, entries }), null);
+    assert.equal(normalizeProtocolBackups({ version: 1, entries: [] }), null);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 function injectedStore(directory, fault) {
   const module = { exports: {} };
   const injectedFs = Object.create(fs);
@@ -52,7 +98,7 @@ function injectedStore(directory, fault) {
     };
   }
   const source = fs.readFileSync(path.join(__dirname, '../../../src/main/settings.cjs'), 'utf8');
-  require('node:vm').compileFunction(source, ['require', 'module'])(id => id === 'node:fs' ? injectedFs : require(id), module);
+  require('node:vm').compileFunction(source, ['require', 'module'])(id => id === 'node:fs' ? injectedFs : id.startsWith('./') ? require(path.join(__dirname, '../../../src/main', id)) : require(id), module);
   return module.exports.createSettingsStore(directory);
 }
 
