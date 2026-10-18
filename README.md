@@ -58,7 +58,7 @@ SlateRandom 做了几件很朴素的事：
 
 ### Windows 桌面版
 
-1. 解压 `SlateRandom-1.0.0-windows-x64.zip`。ARM64 设备用 `...-arm64.zip`。
+1. 解压 `SlateRandom-<版本>-windows-x64.zip`。ARM64 设备用 `...-arm64.zip`。
 2. 在完整文件夹里双击 `SlateRandom.exe`。
 3. 第一次打开会先进引导，在那里导入自己的班级。
 
