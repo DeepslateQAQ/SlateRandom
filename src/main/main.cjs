@@ -462,7 +462,14 @@ async function hideMain() {
   if (!main || main.isDestroyed() || !main.isVisible()) return;
   mainConfirming = false;broadcast();
   if (await rendererOpacity(main,1,0,160)) {
+    // Hiding never returns activation by itself; Windows only reassigns it to the
+    // next visible window in Z-order. While this window stays in the screen-saver
+    // band that window is the taskbar, so the user's application never gets focus
+    // back. Leave the band, release activation, then re-arm the topmost level.
+    const focused = main.isFocused();
+    if (focused) { main.setAlwaysOnTop(false); main.blur(); }
     main.hide();
+    if (focused) main.setAlwaysOnTop(true, 'screen-saver');
     await setRendererOpacity(main, 1);
     if (settings.showFloatingBall) ball.showInactive();
     broadcast();

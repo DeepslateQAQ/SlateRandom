@@ -68,6 +68,8 @@ Electron 主进程在 `src/main/main.cjs`；同一离线 HTML 按窗口角色装
 
 主界面显示时隐藏悬浮球，收起后通过 `showInactive()` 恢复；悬浮球为 `focusable: false`，意外 focus 也立即 blur。主进程每 1.5 秒维护 `setAlwaysOnTop` 和 `moveTop`，不激活窗口、不抢走用户键盘焦点。作者外链仅精确放行 `https://github.com/DeepslateQAQ` 到系统浏览器，主窗口仍拒绝其他外链导航。
 
+主界面收起时，淡出成功后若仍持焦，先退出 `screen-saver` 置顶带再 `blur()`，然后 `hide()` 并恢复置顶。隐藏窗口的失焦请求会被忽略；而 Windows 只把前台交给 Z 序下一个可见窗口，主界面留在置顶带时那个窗口是任务栏，用户原来的应用永远拿不回焦点。已切到其他应用或收起被重新打开取消时，不改动置顶带和当前焦点。
+
 悬浮球保留后台节流，使原生隐藏与 Chromium 渲染子窗口同步，恢复后鼠标按下仍能进入页面；主界面不节流以保持抽选动画。显示主界面前取消球体拖动、长按与关闭确认，窗口切换后发布实际可见状态；渲染器据此清除触点与 hover，隐藏的球体不接受迟到的拖动或确认请求。
 
 Windows 设置存入 `data/desktop-settings.json`，独立于班级仓库；启动项通过当前用户登录设置更新。Windows 原生权限辅助程序编译为 `SlateRandom.Privileges.exe`，安装在 `resources/windows`，与 ASAR 隔离；它负责 UAC 和 UIAccess 令牌操作，JavaScript 不能自行伪造提权成功。取消 UAC 或系统不允许 UIAccess 时，返回实际状态与错误，不将开关当作权限已经授予。

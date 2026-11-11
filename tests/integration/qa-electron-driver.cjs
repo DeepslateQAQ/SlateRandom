@@ -290,9 +290,9 @@ app.whenReady().then(async()=>{
     await run(main,()=>DialogTransitions.close(document.getElementById('configDialog')));
     await shot(main,'desktop-main.png');
     await run(main,()=>document.getElementById('desktopCloseMainBtn').click());await wait(()=>!main.isVisible());
-    check('红色关闭按钮隐藏主界面并恢复悬浮球，程序继续运行',!ball.isDestroyed()&&!main.isDestroyed()&&ball.isVisible());
+    check('红色关闭按钮使主界面失焦并隐藏、恢复悬浮球，程序继续运行',!ball.isDestroyed()&&!main.isDestroyed()&&!main.isFocused()&&ball.isVisible());
     await pause(1650);
-    check('悬浮球显示后持续置顶且不获取焦点或重新显示主界面',ball.isVisible()&&!ball.isFocusable()&&!ball.isFocused()&&ball.isAlwaysOnTop()&&!main.isVisible());
+    check('悬浮球显示后持续置顶且不获取焦点或重新激活主界面',ball.isVisible()&&!ball.isFocusable()&&!ball.isFocused()&&ball.isAlwaysOnTop()&&!main.isVisible()&&!main.isFocused());
     await run(ball,()=>slateDesktop.openMain());
     await run(main,()=>{document.getElementById('resetDrawBtn').inert=true;window.__quitSiblingInert=Array.from(document.querySelector('.home-actions').children).filter(e=>!e.classList.contains('desktop-close-main')).map(e=>({id:e.id,inert:e.inert}));});
     const closeBounds=await run(main,()=>{const b=document.getElementById('desktopCloseMainBtn').getBoundingClientRect();return {x:Math.round(b.left+b.width/2),y:Math.round(b.top+b.height/2)};});

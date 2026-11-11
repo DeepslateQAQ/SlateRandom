@@ -15,7 +15,7 @@ async function until(predicate) {
 const settle = () => new Promise(resolve => setTimeout(resolve, 30));
 function harness(options = {}) {
   const appReady = deferred(), status = deferred(), windows = [], ready = new Map(), handlers = new Map(), listeners = new Map(), effects = [], privilegeArgs = [], protocolCalls = [];
-  let disk = normalizeSettings(options.settings), writeCount = 0, clock = 0, protocols = null;
+  let disk = normalizeSettings(options.settings), writeCount = 0, clock = 0, protocols = null, foreground = null;
   const app = Object.assign(new EventEmitter(), {
     isPackaged: options.packaged === true, commandLine: { appendSwitch() {} },
     setName() {}, setAppUserModelId() {}, setPath() {}, getPath: () => '/mock/data',
@@ -25,7 +25,7 @@ function harness(options = {}) {
   class Window extends EventEmitter {
     constructor(config) {
       super(); this.config = config; this.bounds = { x: config.x, y: config.y, width: config.width, height: config.height };
-      this.visible = false; this.destroyed = false; this.alpha = 1;
+      this.visible = false; this.destroyed = false; this.alpha = 1; this.topmost = true; this.calls = [];
       this.webContents = Object.assign(new EventEmitter(), {
         mainFrame: { url: '' }, isDestroyed: () => this.destroyed, getURL: () => this.webContents.mainFrame.url,
         stateSnapshots: [], sent: [], scripts: [], openHandler: null, setWindowOpenHandler(handler) { this.openHandler = handler; },
@@ -37,13 +37,19 @@ function harness(options = {}) {
     }
     static fromWebContents(sender) { return windows.find(win => win.webContents === sender); }
     static getAllWindows() { return windows.filter(win => !win.destroyed); }
-    removeMenu() {} setAlwaysOnTop() {} blur() {} focus() {} setShape() {}
+    removeMenu() {} setShape() {}
+    setAlwaysOnTop(flag, level) { this.topmost = flag === true; this.calls.push(['setAlwaysOnTop', flag, level ?? null]); }
+    // Hiding alone need not release native focus; Electron ignores blur once hidden.
+    // Win32 blur selects the next visible HWND, even if another app is already active.
+    blur() { this.calls.push('blur'); if (this.visible) foreground = null; }
+    focus() { this.calls.push('focus'); if (this.visible && this.config.focusable !== false) foreground = this; }
     getBounds() { return { ...this.bounds }; } getContentBounds() { return this.getBounds(); }
     setBounds(bounds) { this.bounds = { ...bounds }; }
     getOpacity() { return this.alpha; } setOpacity(value) { this.alpha = value; }
-    isDestroyed() { return this.destroyed; } isVisible() { return this.visible; }
-    show() { this.visible = true; } showInactive() { this.visible = true; } hide() { this.visible = false; }
-    destroy() { this.destroyed = true; this.visible = false; }
+    isDestroyed() { return this.destroyed; } isVisible() { return this.visible; } isFocused() { return foreground === this; }
+    show() { this.visible = true; this.focus(); } showInactive() { this.visible = true; }
+    hide() { this.calls.push('hide'); this.visible = false; }
+    destroy() { this.destroyed = true; this.visible = false; if (foreground === this) foreground = null; }
     async loadURL(url) { this.webContents.mainFrame.url = url; }
     async loadFile(file, { query }) { this.webContents.mainFrame.url = require('node:url').pathToFileURL(file).href + '?' + new URLSearchParams(query); }
   }
@@ -114,6 +120,7 @@ function harness(options = {}) {
   }, module, path.dirname(entry), entry, process, callback => setImmediate(callback), { now: () => clock += 1000 });
   return { app, screen, windows, ready, effects, privilegeArgs, protocolCalls, store, api: module.exports,
     start: () => appReady.resolve(), resolveStatus: () => status.resolve(native),
+    focusExternal(value) { foreground = value; }, getForeground: () => foreground,
     event(win = module.exports.getWindows().main, url) {
       if (url) win.webContents.mainFrame.url = url;
       return { sender: win.webContents, senderFrame: win.webContents.mainFrame };
@@ -302,15 +309,80 @@ test('main open and hide publish native visibility to both renderers on every ro
   for (let round = 0; round < 2; round++) {
     await ctx.invoke('slate:open-main', ctx.event(ball));
     assert.equal(main.isVisible(), true);assert.equal(ball.isVisible(), false);
+    assert.equal(main.isFocused(), true);assert.equal(ball.isFocused(), false);
     for (const win of [main, ball]) {
       assert.equal(win.webContents.stateSnapshots.at(-1)?.main.visible, main.isVisible());
     }
     await ctx.invoke('slate:hide-main', ctx.event(main));
     assert.equal(main.isVisible(), false);assert.equal(ball.isVisible(), true);
+    assert.equal(main.isFocused(), false);assert.equal(ball.isFocused(), false);
     for (const win of [main, ball]) {
       assert.equal(win.webContents.stateSnapshots.at(-1)?.main.visible, main.isVisible());
     }
   }
+});
+
+test('closing a focused main window leaves the topmost band before releasing activation and re-arms it', async () => {
+  const ctx = harness();ctx.start();await until(() => ctx.api.isReady());
+  const { main, ball } = ctx.api.getWindows();
+  await ctx.invoke('slate:open-main', ctx.event(ball));
+  main.calls.length = 0;
+  await ctx.invoke('slate:hide-main', ctx.event(main));
+  assert.deepEqual(main.calls, [['setAlwaysOnTop', false, null], 'blur', 'hide', ['setAlwaysOnTop', true, 'screen-saver']]);
+  assert.equal(main.topmost, true);
+});
+
+test('closing a main window the user already left does not reorder the topmost band', async () => {
+  const ctx = harness();ctx.start();await until(() => ctx.api.isReady());
+  const { main, ball } = ctx.api.getWindows();
+  await ctx.invoke('slate:open-main', ctx.event(ball));
+  ctx.focusExternal('another-application');
+  main.calls.length = 0;
+  await ctx.invoke('slate:hide-main', ctx.event(main));
+  assert.deepEqual(main.calls, ['hide']);
+  assert.equal(main.isVisible(), false);assert.equal(ctx.getForeground(), 'another-application');
+});
+
+test('native close releases main focus even when the floating ball is disabled', async () => {
+  const ctx = harness({ settings: { showFloatingBall: false } });ctx.start();
+  await until(() => ctx.api.isReady());
+  const { main, ball } = ctx.api.getWindows();
+  assert.equal(main.isFocused(), true);
+  let prevented = false;
+  main.emit('close', { preventDefault() { prevented = true; } });
+  await until(() => !main.isVisible());
+  assert.equal(prevented, true);assert.equal(main.isDestroyed(), false);
+  assert.equal(main.isFocused(), false);assert.equal(ball.isVisible(), false);assert.equal(ball.isFocused(), false);
+});
+
+test('switching apps during fade-out preserves the newly focused application', async () => {
+  const ctx = harness();ctx.start();await until(() => ctx.api.isReady());
+  const { main, ball } = ctx.api.getWindows();
+  await ctx.invoke('slate:open-main', ctx.event(ball));
+  const fade = deferred(), execute = main.webContents.executeJavaScript;
+  main.webContents.executeJavaScript = () => fade.promise;
+  const hiding = ctx.invoke('slate:hide-main', ctx.event(main));
+  ctx.focusExternal('another-application');
+  main.webContents.executeJavaScript = execute;
+  fade.resolve(true);
+  await hiding;
+  assert.equal(main.isVisible(), false);assert.equal(ball.isFocused(), false);
+  assert.equal(ctx.getForeground(), 'another-application');
+});
+
+test('cancelled hide keeps the reopened main window focused', async () => {
+  const ctx = harness();ctx.start();await until(() => ctx.api.isReady());
+  const { main, ball } = ctx.api.getWindows();
+  await ctx.invoke('slate:open-main', ctx.event(ball));
+  const fade = deferred(), execute = main.webContents.executeJavaScript;
+  main.webContents.executeJavaScript = () => fade.promise;
+  const hiding = ctx.invoke('slate:hide-main', ctx.event(main));
+  assert.equal(main.isVisible(), true);assert.equal(main.isFocused(), true);
+  main.webContents.executeJavaScript = execute;
+  await ctx.invoke('slate:open-main', ctx.event(ball));
+  fade.resolve(true);
+  await hiding;
+  assert.equal(main.isVisible(), true);assert.equal(main.isFocused(), true);assert.equal(ball.isVisible(), false);
 });
 
 test('opening main cancels interrupted ball drag and hidden input cannot revive or move it', async () => {
